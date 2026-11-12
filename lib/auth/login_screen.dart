@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
 import '../settings/app_info.dart';
 import '../theme/app_gradients.dart';
@@ -85,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final panelWidth = (constraints.maxWidth * 0.44).clamp(440.0, 640.0);
           return Stack(
             children: [
-              const Positioned.fill(child: _PageGlows()),
+              const Positioned.fill(child: PageGlows()),
               Positioned(
                 left: 0,
                 top: 0,
@@ -259,38 +260,6 @@ class _ErrorBanner extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Faint coloured spots behind the form, echoing the panel.
-class _PageGlows extends StatelessWidget {
-  const _PageGlows();
-
-  static const _centres = [Alignment(0.7, -0.8), Alignment(0.2, 0.9)];
-
-  @override
-  Widget build(BuildContext context) {
-    final glows = AppGradients.of(context).pageGlows;
-
-    return ColoredBox(
-      color: Theme.of(context).colorScheme.surface,
-      child: Stack(
-        children: [
-          for (var i = 0; i < glows.length; i++)
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: _centres[i % _centres.length],
-                    radius: 0.8,
-                    colors: [glows[i], glows[i].withValues(alpha: 0)],
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

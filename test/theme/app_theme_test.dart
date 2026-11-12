@@ -1,3 +1,4 @@
+import 'package:cash_client_desktop/theme/app_gradients.dart';
 import 'package:cash_client_desktop/theme/app_status_colors.dart';
 import 'package:cash_client_desktop/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -89,14 +90,16 @@ void main() {
         expect(buttonText!.fontFamily, AppTheme.fontFamily);
       });
 
-      test('sidebar uses checked colour pairings', () {
+      test('sidebar uses the gradient panel colours', () {
+        // The pairings themselves are checked in app_gradients_test.dart.
         final rail = theme.navigationRailTheme;
-        expect(rail.backgroundColor, s.surfaceContainerLow);
-        expect(rail.indicatorColor, s.primaryContainer);
-        expect(rail.selectedIconTheme!.color, s.onPrimaryContainer);
-        expect(rail.selectedLabelTextStyle!.color, s.primary);
-        expect(rail.unselectedIconTheme!.color, s.onSurfaceVariant);
-        expect(rail.unselectedLabelTextStyle!.color, s.onSurfaceVariant);
+        final g = theme.extension<AppGradients>()!;
+        expect(rail.backgroundColor, Colors.transparent);
+        expect(rail.indicatorColor, g.glassFill);
+        expect(rail.selectedIconTheme!.color, g.panelText);
+        expect(rail.selectedLabelTextStyle!.color, g.panelText);
+        expect(rail.unselectedIconTheme!.color, g.panelTextSecondary);
+        expect(rail.unselectedLabelTextStyle!.color, g.panelTextSecondary);
       });
 
       test('buttons meet the 48dp minimum height', () {

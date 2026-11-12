@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../common/brand_mark.dart';
+import '../common/gradient_backdrop.dart';
 import '../theme/app_gradients.dart';
 import 'shield_illustration.dart';
 
@@ -15,13 +16,6 @@ class SignInPanel extends StatelessWidget {
   /// the curve bulges back out to within a quarter of this from the edge.
   static const double curveDepth = 56;
 
-  // Where the soft glows sit; matched to the colours by index.
-  static const _glowCentres = [
-    Alignment(-0.6, -0.7),
-    Alignment(0.7, 0.5),
-    Alignment(-0.7, 0.8),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final gradients = AppGradients.of(context);
@@ -29,76 +23,56 @@ class SignInPanel extends StatelessWidget {
 
     return ClipPath(
       clipper: const _CurvedEdgeClipper(curveDepth),
-      child: DecoratedBox(
-        decoration: BoxDecoration(gradient: gradients.panel),
-        child: Stack(
-          children: [
-            for (var i = 0; i < gradients.panelGlows.length; i++)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: _glowCentres[i % _glowCentres.length],
-                      radius: 0.9,
-                      colors: [
-                        gradients.panelGlows[i],
-                        gradients.panelGlows[i].withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            Padding(
-              // Extra room on the right keeps content clear of the curve.
-              padding: const EdgeInsets.fromLTRB(40, 32, 40 + curveDepth, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: GradientBackdrop(
+        child: Padding(
+          // Extra room on the right keeps content clear of the curve.
+          padding: const EdgeInsets.fromLTRB(40, 32, 40 + curveDepth, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
+                  const BrandMark(),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const BrandMark(),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Cash Client',
-                            style: textTheme.titleLarge?.copyWith(
-                              color: gradients.panelText,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            'For administrators and agents',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: gradients.panelTextSecondary,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'Cash Client',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: gradients.panelText,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'For administrators and agents',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: gradients.panelTextSecondary,
+                        ),
                       ),
                     ],
                   ),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => Center(
-                        child: ShieldIllustration(
-                          size: math.min(
-                            300,
-                            math.min(
-                              constraints.maxWidth * 0.7,
-                              constraints.maxHeight * 0.8,
-                            ),
-                          ),
+                ],
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Center(
+                    child: ShieldIllustration(
+                      size: math.min(
+                        300,
+                        math.min(
+                          constraints.maxWidth * 0.7,
+                          constraints.maxHeight * 0.8,
                         ),
                       ),
                     ),
                   ),
-                  // Balances the brand row so the shield sits in the middle.
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
-            ),
-          ],
+              // Balances the brand row so the shield sits in the middle.
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );

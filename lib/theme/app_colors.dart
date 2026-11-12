@@ -118,6 +118,9 @@ abstract final class AppColors {
   ];
   static const lightGlassFill = Color(0x8CFFFFFF);
   static const lightGlassBorder = Color(0xE6FFFFFF);
+  // Frosted cards over the page glows (Settings): white at 72%, border at 95%.
+  static const lightGlassCard = Color(0xB8FFFFFF);
+  static const lightGlassCardBorder = Color(0xF2FFFFFF);
 
   // Dark mode. Deep navy to teal, with translucent glows.
   static const darkPanelStops = [
@@ -144,4 +147,7 @@ abstract final class AppColors {
   ];
   static const darkGlassFill = Color(0x1AFFFFFF);
   static const darkGlassBorder = Color(0x47FFFFFF);
+  // The dark card colour at 75%, with a faint white border.
+  static const darkGlassCard = Color(0xBF141A2A);
+  static const darkGlassCardBorder = Color(0x38FFFFFF);
 }

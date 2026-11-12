@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// The lighter gradients: the sign-in panel, its illustration and glass
-/// labels, the soft page glows, and the gradient primary button.
+/// The lighter gradients: the sidebar and sign-in panel, the illustration
+/// and glass labels, the soft page glows with frosted cards, and the
+/// gradient used for primary buttons, switches and icon tiles.
 ///
 /// Read it with `AppGradients.of(context)`. Light and dark instances are
 /// registered on the matching [ThemeData].
@@ -19,6 +20,8 @@ class AppGradients extends ThemeExtension<AppGradients> {
     required this.illustration,
     required this.glassFill,
     required this.glassBorder,
+    required this.glassCard,
+    required this.glassCardBorder,
     required this.pageGlows,
   });
 
@@ -41,7 +44,11 @@ class AppGradients extends ThemeExtension<AppGradients> {
   final Color glassFill;
   final Color glassBorder;
 
-  /// Faint radial spots behind the sign-in form.
+  /// Frosted cards laid over [pageGlows], such as the Settings cards.
+  final Color glassCard;
+  final Color glassCardBorder;
+
+  /// Faint radial spots behind the sign-in form and Settings.
   final List<Color> pageGlows;
 
   static const light = AppGradients(
@@ -66,6 +73,8 @@ class AppGradients extends ThemeExtension<AppGradients> {
     ),
     glassFill: AppColors.lightGlassFill,
     glassBorder: AppColors.lightGlassBorder,
+    glassCard: AppColors.lightGlassCard,
+    glassCardBorder: AppColors.lightGlassCardBorder,
     pageGlows: AppColors.lightPageGlows,
   );
 
@@ -91,6 +100,8 @@ class AppGradients extends ThemeExtension<AppGradients> {
     ),
     glassFill: AppColors.darkGlassFill,
     glassBorder: AppColors.darkGlassBorder,
+    glassCard: AppColors.darkGlassCard,
+    glassCardBorder: AppColors.darkGlassCardBorder,
     pageGlows: AppColors.darkPageGlows,
   );
 
@@ -108,6 +119,8 @@ class AppGradients extends ThemeExtension<AppGradients> {
     LinearGradient? illustration,
     Color? glassFill,
     Color? glassBorder,
+    Color? glassCard,
+    Color? glassCardBorder,
     List<Color>? pageGlows,
   }) {
     return AppGradients(
@@ -120,6 +133,8 @@ class AppGradients extends ThemeExtension<AppGradients> {
       illustration: illustration ?? this.illustration,
       glassFill: glassFill ?? this.glassFill,
       glassBorder: glassBorder ?? this.glassBorder,
+      glassCard: glassCard ?? this.glassCard,
+      glassCardBorder: glassCardBorder ?? this.glassCardBorder,
       pageGlows: pageGlows ?? this.pageGlows,
     );
   }
@@ -140,6 +155,8 @@ class AppGradients extends ThemeExtension<AppGradients> {
       illustration: _lerpGradient(illustration, other.illustration, t),
       glassFill: Color.lerp(glassFill, other.glassFill, t)!,
       glassBorder: Color.lerp(glassBorder, other.glassBorder, t)!,
+      glassCard: Color.lerp(glassCard, other.glassCard, t)!,
+      glassCardBorder: Color.lerp(glassCardBorder, other.glassCardBorder, t)!,
       pageGlows: _lerpColors(pageGlows, other.pageGlows, t),
     );
   }

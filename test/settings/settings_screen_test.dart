@@ -1,3 +1,4 @@
+import 'package:cash_client_desktop/common/gradient_switch.dart';
 import 'package:cash_client_desktop/settings/settings_screen.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
 import 'package:cash_client_desktop/shell/sidebar_controller.dart';
@@ -46,8 +47,12 @@ void main() {
   SegmentedButton<ThemeMode> picker(WidgetTester tester) =>
       tester.widget(find.byKey(const Key('settings.themeMode')));
 
-  SwitchListTile rememberSwitch(WidgetTester tester) =>
-      tester.widget(find.byKey(const Key('settings.rememberSidebar')));
+  GradientSwitch rememberSwitch(WidgetTester tester) => tester.widget(
+        find.descendant(
+          of: find.byKey(const Key('settings.rememberSidebar')),
+          matching: find.byType(GradientSwitch),
+        ),
+      );
 
   testWidgets('shows Appearance above About', (tester) async {
     await pumpSettings(tester);
@@ -121,6 +126,22 @@ void main() {
     expect(sidebar.remember, isFalse);
     expect(sidebarStore.remember, isFalse);
     expect(rememberSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('tapping the switch itself also toggles it', (tester) async {
+    await pumpSettings(tester);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(sidebar.remember, isFalse);
+  });
+
+  testWidgets('cards have gradient icon tiles', (tester) async {
+    await pumpSettings(tester);
+
+    expect(find.byIcon(Icons.palette_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.info_outline), findsOneWidget);
   });
 
   testWidgets('shows a saved off choice', (tester) async {

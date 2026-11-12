@@ -175,22 +175,26 @@ abstract final class AppTheme {
           minimumSize: WidgetStatePropertyAll(Size(0, minTouchTarget)),
         ),
       ),
-      // The sidebar sits on the card colour so it reads as a separate panel
-      // from the page. Every pairing below is covered by the contrast tests:
-      // primary and secondary text on a card, and the primary container.
+      // The sidebar sits on the light gradient panel (option D3). The selected
+      // item is a glass pill. Every pairing below is covered by the contrast
+      // tests in app_gradients_test.dart.
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: scheme.surfaceContainerLow,
-        indicatorColor: scheme.primaryContainer,
-        selectedIconTheme: IconThemeData(color: scheme.onPrimaryContainer),
-        unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+        backgroundColor: Colors.transparent,
+        indicatorColor: gradients.glassFill,
+        indicatorShape: StadiumBorder(
+          side: BorderSide(color: gradients.glassBorder),
+        ),
+        selectedIconTheme: IconThemeData(color: gradients.panelText),
+        unselectedIconTheme:
+            IconThemeData(color: gradients.panelTextSecondary),
         selectedLabelTextStyle: TextStyle(
           fontFamily: fontFamily,
-          color: scheme.primary,
+          color: gradients.panelText,
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelTextStyle: TextStyle(
           fontFamily: fontFamily,
-          color: scheme.onSurfaceVariant,
+          color: gradients.panelTextSecondary,
         ),
       ),
       dividerTheme: DividerThemeData(color: scheme.outlineVariant, space: 1),

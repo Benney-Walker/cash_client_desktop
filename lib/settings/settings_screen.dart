@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../common/gradient_backdrop.dart';
+import '../common/gradient_icon_tile.dart';
+import '../common/gradient_switch.dart';
 import '../shell/section_page.dart';
 import '../shell/sidebar_controller.dart';
+import '../theme/app_gradients.dart';
+import '../theme/app_theme.dart';
 import 'app_info.dart';
 import 'theme_controller.dart';
 
-/// Settings, laid out as one column of section cards (option A, chosen by
-/// the owner).
+/// Settings, laid out as one column of section cards (option A), styled as
+/// frosted glass cards over soft gradient glows (option S3).
 ///
 /// The agreed order is Account, Password, Appearance, About. Account and
 /// Password need sign-in, so they'll be added above Appearance when sign-in
@@ -25,44 +30,72 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SectionPage(
-      title: 'Settings',
-      maxContentWidth: 560,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SettingsCard(
-            key: const Key('settings.appearance'),
-            title: 'Appearance',
-            child: _AppearanceSection(theme: theme, sidebar: sidebar),
+    return Stack(
+      children: [
+        const Positioned.fill(child: PageGlows()),
+        SectionPage(
+          title: 'Settings',
+          maxContentWidth: 560,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                key: const Key('settings.appearance'),
+                title: 'Appearance',
+                icon: Icons.palette_outlined,
+                child: _AppearanceSection(theme: theme, sidebar: sidebar),
+              ),
+              const SizedBox(height: 16),
+              _SettingsCard(
+                key: const Key('settings.about'),
+                title: 'About',
+                icon: Icons.info_outline,
+                child: _AboutSection(appInfo: appInfo),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          _SettingsCard(
-            key: const Key('settings.about'),
-            title: 'About',
-            child: _AboutSection(appInfo: appInfo),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
+/// A frosted card: semi-transparent so the page glows show through, with a
+/// gradient icon tile beside the title.
 class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({super.key, required this.title, required this.child});
+  const _SettingsCard({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   final String title;
+  final IconData icon;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
+    final gradients = AppGradients.of(context);
+
     return Card(
+      color: gradients.glassCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        side: BorderSide(color: gradients.glassCardBorder),
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                GradientIconTile(icon: icon),
+                const SizedBox(width: 10),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
             const SizedBox(height: 12),
             child,
           ],
@@ -129,14 +162,20 @@ class _AppearanceSection extends StatelessWidget {
         const Divider(),
         ListenableBuilder(
           listenable: sidebar,
-          // The whole row toggles the switch, not just the knob.
-          builder: (context, _) => SwitchListTile(
-            key: const Key('settings.rememberSidebar'),
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Remember sidebar state'),
-            subtitle: const Text('Reopen with the sidebar as you left it'),
-            value: sidebar.remember,
-            onChanged: sidebar.setRemember,
+          // The whole row toggles the switch, not just the knob, and screen
+          // readers hear the label and the switch as one control.
+          builder: (context, _) => MergeSemantics(
+            child: ListTile(
+              key: const Key('settings.rememberSidebar'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Remember sidebar state'),
+              subtitle: const Text('Reopen with the sidebar as you left it'),
+              trailing: GradientSwitch(
+                value: sidebar.remember,
+                onChanged: sidebar.setRemember,
+              ),
+              onTap: () => sidebar.setRemember(!sidebar.remember),
+            ),
           ),
         ),
       ],

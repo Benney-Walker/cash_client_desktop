@@ -71,6 +71,34 @@ void main() {
         }
       });
 
+      test('text on glass cards is readable over the page glows', () {
+        final scheme = entry.value.colorScheme;
+        final pages = [
+          scheme.surface,
+          for (final glow in g!.pageGlows)
+            Color.alphaBlend(glow, scheme.surface),
+        ];
+        for (final page in pages) {
+          final card = Color.alphaBlend(g.glassCard, page);
+          for (final text in [
+            scheme.onSurface,
+            scheme.onSurfaceVariant,
+            scheme.primary,
+          ]) {
+            expect(
+              contrastRatio(text, card),
+              greaterThanOrEqualTo(minTextContrast),
+              reason: '$text on $card',
+            );
+          }
+          // Input outlines on the cards are non-text UI.
+          expect(
+            contrastRatio(scheme.outline, card),
+            greaterThanOrEqualTo(minUiContrast),
+          );
+        }
+      });
+
       test('form text is readable on the page glows', () {
         final scheme = entry.value.colorScheme;
         for (final glow in g!.pageGlows) {

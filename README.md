@@ -44,12 +44,12 @@ yet." This switch is temporary and goes once sign-in is wired up.
 | Theme | ✅ Indigo Aurora, identical to the mobile app; light, dark and follow-the-system |
 | Font | ✅ Inter bundled (Regular, Medium, SemiBold, Bold) |
 | Window | ✅ Opens maximised on Windows and macOS; minimum size 1280×720 |
-| Sidebar shell | ✅ Collapsible left sidebar, state remembered between launches (can be turned off); every section is a placeholder |
-| Settings | ✅ Option A layout (one column of cards): Appearance (light/dark, remember sidebar state) and About (version, server). Account and Password cards come with sign-in |
+| Sidebar shell | ✅ Collapsible left sidebar on the light gradient panel (D3), glass highlight on the selected item, state remembered between launches (can be turned off); every section is a placeholder |
+| Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Appearance (light/dark, remember sidebar state) and About (version, server). Account and Password cards come with sign-in |
 | Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. Not connected to the backend yet; preview with `--dart-define=PREVIEW_LOGIN=true` |
 | Sign-in and session | Not started: waits for the backend review |
 | Lock after 10 minutes idle | Not started: needs sign-in |
-| Dashboard and all business sections | Not started: requirements and backend contracts still open |
+| Dashboard and all business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
 
@@ -68,7 +68,8 @@ sign-in exists and the role rules are confirmed.
   an icon and a label, never colour alone; amounts are neutral, in GH₵ with 2
   decimals and fixed-width digits.
 - **Gradients (desktop):** every primary button uses the button gradient
-  (`GradientButton`, one per screen); hero surfaces such as the sign-in panel
+  (`GradientButton`, one per screen), and so do switches when on
+  (`GradientSwitch`) and the icon tiles on cards; hero surfaces such as the sign-in panel
   use the lighter gradients in `lib/theme/app_gradients.dart`. The lighter
   tints were added to the shared palette on 2026-11-12, so the mobile app is
   to adopt them too. Text on every gradient meets 4.5:1
@@ -76,16 +77,18 @@ sign-in exists and the role rules are confirmed.
 - **Font:** Inter, bundled so Windows and macOS look the same. The files are
   static instances generated from the Google Fonts release of Inter (optical
   size 14). Licence: `assets/fonts/inter/OFL.txt` (SIL Open Font License 1.1).
-- **Layout:** collapsible left sidebar, opening expanded. Style chosen from
-  three previewed options: a light panel on the card colour, the selected
-  item highlighted with a soft indigo pill, Settings as the last item.
+- **Layout:** collapsible left sidebar, opening expanded. Restyled on
+  2026-11-12 (option D3): the sidebar is the light gradient panel, the
+  selected item a glass pill, with the "CC" tile beside the app name.
+  (Replaces the earlier light-panel style A.)
 - **Window:** opens maximised, and can't be made smaller than 1280×720.
   Restoring it on Windows gives 1280×720.
 - **Backend address:** fixed at build time with `--dart-define`, never
   editable in the app.
 - **Idle lock:** after 10 minutes without activity (to be built with sign-in).
 - **Settings:** one column of section cards, in the order Account, Password,
-  Appearance, About. "Remember sidebar state" is on by default, following
+  Appearance, About, styled as frosted glass cards over soft gradient glows
+  (option S3) with gradient icon tiles. "Remember sidebar state" is on by default, following
   the usual desktop convention of reopening the layout as the user left it.
   About reads the version from the installed app (`package_info_plus`) and
   shows the build's backend address.
@@ -123,6 +126,9 @@ test/                  mirrors lib/
 - **2026-11-12** Sign-in screen (light A1) built, not yet connected. Lighter
   gradient tints and the gradient primary button added. Temporary
   `PREVIEW_LOGIN` switch to view it.
+- **2026-11-12** Sidebar moved onto the light gradient panel (D3); Settings
+  restyled as glass cards on gradient glows (S3); gradient switch and icon
+  tiles. Dashboard body waits for its contents to be decided.
 
 ## Known limitations
 

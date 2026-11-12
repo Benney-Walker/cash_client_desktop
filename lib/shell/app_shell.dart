@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../common/brand_mark.dart';
+import '../common/gradient_backdrop.dart';
 import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
 import '../settings/theme_controller.dart';
+import '../theme/app_gradients.dart';
 import 'app_section.dart';
 import 'section_page.dart';
 import 'sidebar_controller.dart';
 
-/// The main window layout: a collapsible sidebar on the left and the selected
-/// section's page beside it.
+/// The main window layout: a collapsible sidebar on the light gradient panel
+/// (option D3) and the selected section's page beside it.
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -43,31 +46,37 @@ class _AppShellState extends State<AppShell> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavigationRail(
-            key: const Key('shell.sidebar'),
-            extended: expanded,
-            minExtendedWidth: _expandedWidth,
-            // Labels show beside the icons when expanded. Collapsed, the rail
-            // is icons only and each icon has a tooltip instead.
-            labelType: NavigationRailLabelType.none,
-            leading: _SidebarHeader(
-              expanded: expanded,
-              onToggle: widget.sidebar.toggle,
+          // The gradient's own edge separates the sidebar from the page, so
+          // there's no divider line.
+          GradientBackdrop(
+            child: NavigationRail(
+              key: const Key('shell.sidebar'),
+              extended: expanded,
+              minExtendedWidth: _expandedWidth,
+              // Labels show beside the icons when expanded. Collapsed, the
+              // rail is icons only and each icon has a tooltip instead.
+              labelType: NavigationRailLabelType.none,
+              leading: _SidebarHeader(
+                expanded: expanded,
+                onToggle: widget.sidebar.toggle,
+              ),
+              selectedIndex: _section.index,
+              onDestinationSelected: (index) =>
+                  setState(() => _section = AppSection.values[index]),
+              destinations: [
+                for (final section in AppSection.values)
+                  NavigationRailDestination(
+                    icon: _railIcon(section.icon, section.label, expanded),
+                    selectedIcon: _railIcon(
+                      section.selectedIcon,
+                      section.label,
+                      expanded,
+                    ),
+                    label: Text(section.label),
+                  ),
+              ],
             ),
-            selectedIndex: _section.index,
-            onDestinationSelected: (index) =>
-                setState(() => _section = AppSection.values[index]),
-            destinations: [
-              for (final section in AppSection.values)
-                NavigationRailDestination(
-                  icon: _railIcon(section.icon, section.label, expanded),
-                  selectedIcon:
-                      _railIcon(section.selectedIcon, section.label, expanded),
-                  label: Text(section.label),
-                ),
-            ],
           ),
-          const VerticalDivider(width: 1, thickness: 1),
           Expanded(child: _page(_section)),
         ],
       ),
@@ -90,7 +99,8 @@ class _AppShellState extends State<AppShell> {
       };
 }
 
-/// The app name and the collapse/expand button at the top of the sidebar.
+/// The "CC" tile, the app name and the collapse/expand button at the top of
+/// the sidebar.
 class _SidebarHeader extends StatelessWidget {
   const _SidebarHeader({required this.expanded, required this.onToggle});
 
@@ -99,12 +109,13 @@ class _SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final gradients = AppGradients.of(context);
     final textTheme = Theme.of(context).textTheme;
 
     final toggle = IconButton(
       key: const Key('shell.toggleSidebar'),
       tooltip: expanded ? 'Collapse sidebar' : 'Expand sidebar',
+      color: gradients.panelTextSecondary,
       onPressed: onToggle,
       icon: Icon(expanded ? Icons.menu_open : Icons.menu),
     );
@@ -112,18 +123,26 @@ class _SidebarHeader extends StatelessWidget {
     if (!expanded) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: toggle,
+        child: Column(
+          children: [
+            const BrandMark(size: 32),
+            const SizedBox(height: 8),
+            toggle,
+          ],
+        ),
       );
     }
 
     // The rail centres its leading widget, so the header is given the full
     // expanded width to keep the name on the left with the toggle at the end.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 8, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: SizedBox(
-        width: _AppShellState._expandedWidth - 28,
+        width: _AppShellState._expandedWidth - 24,
         child: Row(
           children: [
+            const BrandMark(size: 32),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Cash Client',
@@ -131,7 +150,7 @@ class _SidebarHeader extends StatelessWidget {
                 overflow: TextOverflow.fade,
                 softWrap: false,
                 style: textTheme.titleMedium?.copyWith(
-                  color: scheme.primary,
+                  color: gradients.panelText,
                   fontWeight: FontWeight.w700,
                 ),
               ),
