@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_gradients.dart';
 import 'app_status_colors.dart';
 
 /// Light and dark [ThemeData] for the desktop app.
 ///
 /// This follows the collector mobile app's theme so both apps share one look.
-/// The only additions are the bundled Inter font and the sidebar
-/// ([NavigationRail]) styling, which the mobile app doesn't have.
+/// The additions are the bundled Inter font, the sidebar ([NavigationRail])
+/// styling, and the lighter gradients in [AppGradients].
 ///
 /// The colour schemes are written out in full instead of using
 /// `ColorScheme.fromSeed`. A seed would generate its own tones, and the agreed
@@ -56,6 +57,7 @@ abstract final class AppTheme {
           surfaceTint: Colors.transparent,
         ),
         AppStatusColors.light,
+        AppGradients.light,
       );
 
   static ThemeData get dark => _build(
@@ -89,9 +91,14 @@ abstract final class AppTheme {
           surfaceTint: Colors.transparent,
         ),
         AppStatusColors.dark,
+        AppGradients.dark,
       );
 
-  static ThemeData _build(ColorScheme scheme, AppStatusColors status) {
+  static ThemeData _build(
+    ColorScheme scheme,
+    AppStatusColors status,
+    AppGradients gradients,
+  ) {
     final controlShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(controlRadius),
     );
@@ -101,7 +108,7 @@ abstract final class AppTheme {
       colorScheme: scheme,
       fontFamily: fontFamily,
       scaffoldBackgroundColor: scheme.surface,
-      extensions: [status],
+      extensions: [status, gradients],
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,

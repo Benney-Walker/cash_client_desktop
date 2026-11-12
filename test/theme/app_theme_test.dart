@@ -3,20 +3,10 @@ import 'package:cash_client_desktop/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// WCAG 2.x contrast ratio between two opaque colours.
-double contrastRatio(Color a, Color b) {
-  final la = a.computeLuminance();
-  final lb = b.computeLuminance();
-  final lighter = la > lb ? la : lb;
-  final darker = la > lb ? lb : la;
-  return (lighter + 0.05) / (darker + 0.05);
-}
+import '../support/contrast.dart';
 
-// AA for normal-size text. Every text pairing is held to the text standard,
-// not the 3:1 allowed for large text, the same as in the collector app.
-const double minTextContrast = 4.5;
-// AA for non-text UI such as input outlines.
-const double minUiContrast = 3.0;
+// Every text pairing is held to the AA text standard (4.5:1), not the 3:1
+// allowed for large text, the same as in the collector app.
 
 void main() {
   for (final entry in {

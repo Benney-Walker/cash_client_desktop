@@ -11,4 +11,9 @@
 /// server a build talks to.
 abstract final class AppConfig {
   static const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+  /// Temporary, for reviewing the sign-in screen before it's connected to
+  /// the backend: `--dart-define=PREVIEW_LOGIN=true` opens the app on it.
+  /// Remove once sign-in is wired up and the app always starts there.
+  static const previewLogin = bool.fromEnvironment('PREVIEW_LOGIN');
 }
