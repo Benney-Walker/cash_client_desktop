@@ -10,6 +10,9 @@ class MainFlutterWindow: NSWindow {
     let windowFrame = NSScreen.main?.visibleFrame ?? self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
+    // Minimum window size, 1280x720 (owner decision). The layout is designed
+    // for at least that much room.
+    self.minSize = NSSize(width: 1280, height: 720)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

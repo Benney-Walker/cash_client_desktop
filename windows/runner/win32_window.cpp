@@ -31,6 +31,10 @@ static int g_active_window_count = 0;
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
+// Smallest size the user can resize the window to, in logical pixels.
+constexpr int kMinWindowWidth = 1280;
+constexpr int kMinWindowHeight = 720;
+
 // Scale helper to convert logical scaler values to physical using passed in
 // scale factor
 int Scale(int source, double scale_factor) {
@@ -218,6 +222,17 @@ Win32Window::MessageHandler(HWND hwnd,
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);
       return 0;
+
+    case WM_GETMINMAXINFO: {
+      // Minimum window size, 1280x720 (owner decision). The layout is
+      // designed for at least that much room. Scaled for the monitor's DPI
+      // like the initial size in Create.
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      double scale_factor = FlutterDesktopGetDpiForHWND(hwnd) / 96.0;
+      info->ptMinTrackSize.x = Scale(kMinWindowWidth, scale_factor);
+      info->ptMinTrackSize.y = Scale(kMinWindowHeight, scale_factor);
+      return 0;
+    }
   }
 
   return DefWindowProc(window_handle_, message, wparam, lparam);

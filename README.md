@@ -34,7 +34,7 @@ address will be fixed per build, as in the mobile app:
 |---|---|
 | Theme | ✅ Indigo Aurora, identical to the mobile app; light, dark and follow-the-system |
 | Font | ✅ Inter bundled (Regular, Medium, SemiBold, Bold) |
-| Window | ✅ Opens maximised on Windows and macOS |
+| Window | ✅ Opens maximised on Windows and macOS; minimum size 1280×720 |
 | Sidebar shell | ✅ Collapsible left sidebar; every section is a placeholder |
 | Settings | ✅ Light/dark choice, remembered on the computer |
 | Sign-in and session | Not started: waits for the backend review |
@@ -61,10 +61,13 @@ sign-in exists and the role rules are confirmed.
   static instances generated from the Google Fonts release of Inter (optical
   size 14). Licence: `assets/fonts/inter/OFL.txt` (SIL Open Font License 1.1).
 - **Layout:** collapsible left sidebar, opening expanded.
-- **Window:** opens maximised. Restoring it on Windows gives 1280×720.
+- **Window:** opens maximised, and can't be made smaller than 1280×720.
+  Restoring it on Windows gives 1280×720.
 - **Backend address:** fixed at build time with `--dart-define`, never
   editable in the app.
 - **Idle lock:** after 10 minutes without activity (to be built with sign-in).
+- **Designing screens:** before any screen or interface is built, design
+  options are presented to the owner to choose from.
 
 ## Project layout
 
@@ -83,6 +86,7 @@ test/                  mirrors lib/
 - **2026-11-12** Theme, Inter font, maximised window, sidebar shell with
   placeholder sections, Settings with the light/dark choice. Linux runner
   removed. Tests written but not yet run (see below).
+- **2026-11-12** Minimum window size 1280×720 on Windows and macOS.
 
 ## Known limitations
 
