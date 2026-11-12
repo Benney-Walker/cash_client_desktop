@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
 import '../settings/theme_controller.dart';
 import 'app_section.dart';
 import 'section_page.dart';
+import 'sidebar_controller.dart';
 
 /// The main window layout: a collapsible sidebar on the left and the selected
 /// section's page beside it.
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.theme});
+  const AppShell({
+    super.key,
+    required this.theme,
+    required this.sidebar,
+    required this.appInfo,
+  });
 
   final ThemeController theme;
+  final SidebarController sidebar;
+  final AppInfo appInfo;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -21,27 +30,29 @@ class _AppShellState extends State<AppShell> {
 
   AppSection _section = AppSection.dashboard;
 
-  // Starts expanded: the window opens maximised, so there's room for labels.
-  bool _expanded = true;
-
-  void _toggleSidebar() => setState(() => _expanded = !_expanded);
-
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.sidebar,
+      builder: (context, _) => _buildLayout(widget.sidebar.expanded),
+    );
+  }
+
+  Widget _buildLayout(bool expanded) {
     return Scaffold(
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           NavigationRail(
             key: const Key('shell.sidebar'),
-            extended: _expanded,
+            extended: expanded,
             minExtendedWidth: _expandedWidth,
             // Labels show beside the icons when expanded. Collapsed, the rail
             // is icons only and each icon has a tooltip instead.
             labelType: NavigationRailLabelType.none,
             leading: _SidebarHeader(
-              expanded: _expanded,
-              onToggle: _toggleSidebar,
+              expanded: expanded,
+              onToggle: widget.sidebar.toggle,
             ),
             selectedIndex: _section.index,
             onDestinationSelected: (index) =>
@@ -49,8 +60,9 @@ class _AppShellState extends State<AppShell> {
             destinations: [
               for (final section in AppSection.values)
                 NavigationRailDestination(
-                  icon: _railIcon(section.icon, section.label),
-                  selectedIcon: _railIcon(section.selectedIcon, section.label),
+                  icon: _railIcon(section.icon, section.label, expanded),
+                  selectedIcon:
+                      _railIcon(section.selectedIcon, section.label, expanded),
                   label: Text(section.label),
                 ),
             ],
@@ -62,11 +74,15 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _railIcon(IconData icon, String label) =>
-      _expanded ? Icon(icon) : Tooltip(message: label, child: Icon(icon));
+  Widget _railIcon(IconData icon, String label, bool expanded) =>
+      expanded ? Icon(icon) : Tooltip(message: label, child: Icon(icon));
 
   Widget _page(AppSection section) => switch (section) {
-        AppSection.settings => SettingsScreen(theme: widget.theme),
+        AppSection.settings => SettingsScreen(
+            theme: widget.theme,
+            sidebar: widget.sidebar,
+            appInfo: widget.appInfo,
+          ),
         _ => SectionPlaceholder(
             key: Key('page.${section.name}'),
             section: section,

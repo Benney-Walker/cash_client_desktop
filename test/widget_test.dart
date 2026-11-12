@@ -1,5 +1,6 @@
 import 'package:cash_client_desktop/main.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
+import 'package:cash_client_desktop/shell/sidebar_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,7 +17,11 @@ void main() {
 
     final theme = ThemeController(MemoryThemeModeStore(saved));
     await theme.load();
-    await tester.pumpWidget(CashClientApp(theme: theme));
+    final sidebar = SidebarController(MemorySidebarStateStore());
+    await sidebar.load();
+    await tester.pumpWidget(
+      CashClientApp(theme: theme, sidebar: sidebar, appInfo: testAppInfo),
+    );
     return theme;
   }
 

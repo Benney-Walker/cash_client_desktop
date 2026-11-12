@@ -24,9 +24,9 @@ flutter run -d windows   # or: -d macos
 flutter test
 ```
 
-The app doesn't call the backend yet. When sign-in is added, the backend
-address will be fixed per build, as in the mobile app:
-`--dart-define=API_BASE_URL=https://…`.
+The backend address is fixed per build, as in the mobile app:
+`--dart-define=API_BASE_URL=https://…`. The app doesn't call the backend
+yet; Settings > About shows the address (or "Not set for this build").
 
 ## Status
 
@@ -35,8 +35,8 @@ address will be fixed per build, as in the mobile app:
 | Theme | ✅ Indigo Aurora, identical to the mobile app; light, dark and follow-the-system |
 | Font | ✅ Inter bundled (Regular, Medium, SemiBold, Bold) |
 | Window | ✅ Opens maximised on Windows and macOS; minimum size 1280×720 |
-| Sidebar shell | ✅ Collapsible left sidebar; every section is a placeholder |
-| Settings | ✅ Light/dark choice, remembered on the computer |
+| Sidebar shell | ✅ Collapsible left sidebar, state remembered between launches (can be turned off); every section is a placeholder |
+| Settings | ✅ Option A layout (one column of cards): Appearance (light/dark, remember sidebar state) and About (version, server). Account and Password cards come with sign-in |
 | Sign-in and session | Not started: waits for the backend review |
 | Lock after 10 minutes idle | Not started: needs sign-in |
 | Dashboard and all business sections | Not started: requirements and backend contracts still open |
@@ -68,6 +68,11 @@ sign-in exists and the role rules are confirmed.
 - **Backend address:** fixed at build time with `--dart-define`, never
   editable in the app.
 - **Idle lock:** after 10 minutes without activity (to be built with sign-in).
+- **Settings:** one column of section cards, in the order Account, Password,
+  Appearance, About. "Remember sidebar state" is on by default, following
+  the usual desktop convention of reopening the layout as the user left it.
+  About reads the version from the installed app (`package_info_plus`) and
+  shows the build's backend address.
 - **Designing screens:** before any screen or interface is built, design
   options are presented to the owner to choose from.
 
@@ -75,9 +80,10 @@ sign-in exists and the role rules are confirmed.
 
 ```
 lib/
-  main.dart            app start-up, theme mode
-  shell/               sidebar, sections, page layout
-  settings/            settings screen, light/dark choice and its storage
+  main.dart            app start-up
+  config/              build-time settings (--dart-define)
+  shell/               sidebar, its remembered state, sections, page layout
+  settings/            settings screen, light/dark choice, app info
   theme/               colours, status colours, ThemeData
 assets/fonts/inter/    bundled font and licence
 test/                  mirrors lib/
@@ -89,13 +95,17 @@ test/                  mirrors lib/
   placeholder sections, Settings with the light/dark choice. Linux runner
   removed. Tests written but not yet run (see below).
 - **2026-11-12** Minimum window size 1280×720 on Windows and macOS.
+- **2026-11-12** Sidebar style A confirmed. Settings rebuilt as option A:
+  Appearance card with the remember-sidebar switch, About card with version
+  and server. Added `package_info_plus`.
 
 ## Known limitations
 
 - The tests and `flutter analyze` haven't been run yet. The environment this
   was written in couldn't download the Flutter SDK or packages. Run
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
-  `pubspec.lock` will update to add `shared_preferences`.
+  `pubspec.lock` will update to add `shared_preferences` and
+  `package_info_plus`.
 - Windows and macOS builds haven't been run.
 - The macOS menu bar still shows the project name `cash_client_desktop`.
   Changing the product name affects the bundle identifier and is left for

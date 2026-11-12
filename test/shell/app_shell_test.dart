@@ -1,6 +1,7 @@
 import 'package:cash_client_desktop/settings/theme_controller.dart';
 import 'package:cash_client_desktop/shell/app_section.dart';
 import 'package:cash_client_desktop/shell/app_shell.dart';
+import 'package:cash_client_desktop/shell/sidebar_controller.dart';
 import 'package:cash_client_desktop/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,16 +9,26 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fakes.dart';
 
 void main() {
-  Future<void> pumpShell(WidgetTester tester) async {
+  late MemorySidebarStateStore sidebarStore;
+
+  Future<void> pumpShell(WidgetTester tester, {bool? savedExpanded}) async {
     // Roughly a small laptop screen, so the expanded sidebar and a page fit.
     tester.view.physicalSize = const Size(1280, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
+    sidebarStore = MemorySidebarStateStore(expanded: savedExpanded);
+    final sidebar = SidebarController(sidebarStore);
+    await sidebar.load();
+
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: AppShell(theme: ThemeController(MemoryThemeModeStore())),
+        home: AppShell(
+          theme: ThemeController(MemoryThemeModeStore()),
+          sidebar: sidebar,
+          appInfo: testAppInfo,
+        ),
       ),
     );
   }
@@ -88,5 +99,30 @@ void main() {
 
     expect(rail(tester).extended, isTrue);
     expect(find.text('Cash Client'), findsOneWidget);
+  });
+
+  testWidgets('collapsing is saved for next time', (tester) async {
+    await pumpShell(tester);
+
+    await tester.tap(find.byKey(const Key('shell.toggleSidebar')));
+    await tester.pumpAndSettle();
+
+    expect(sidebarStore.expanded, isFalse);
+  });
+
+  testWidgets('opens collapsed when it was left collapsed', (tester) async {
+    await pumpShell(tester, savedExpanded: false);
+
+    expect(rail(tester).extended, isFalse);
+  });
+
+  testWidgets('settings shows the remember switch and About', (tester) async {
+    await pumpShell(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('settings.rememberSidebar')), findsOneWidget);
+    expect(find.byKey(const Key('settings.about')), findsOneWidget);
   });
 }

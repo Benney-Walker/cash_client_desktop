@@ -19,6 +19,9 @@ dependencies:
   # Same version as the collector app. Holds the light/dark choice, which
   # isn't sensitive.
   shared_preferences: ^2.5.6
+  # Reads the installed version for Settings > About. Flutter Community
+  # "Plus" plugins; supports Windows and macOS.
+  package_info_plus: ^10.2.0
 
 dev_dependencies:
   flutter_test:

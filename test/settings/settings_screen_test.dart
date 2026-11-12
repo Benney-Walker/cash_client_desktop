@@ -1,5 +1,6 @@
 import 'package:cash_client_desktop/settings/settings_screen.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
+import 'package:cash_client_desktop/shell/sidebar_controller.dart';
 import 'package:cash_client_desktop/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,17 +8,37 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/fakes.dart';
 
 void main() {
-  late MemoryThemeModeStore store;
+  late MemoryThemeModeStore themeStore;
   late ThemeController theme;
+  late MemorySidebarStateStore sidebarStore;
+  late SidebarController sidebar;
 
-  Future<void> pumpSettings(WidgetTester tester, {ThemeMode? saved}) async {
-    store = MemoryThemeModeStore(saved);
-    theme = ThemeController(store);
+  Future<void> pumpSettings(
+    WidgetTester tester, {
+    ThemeMode? saved,
+    bool? rememberSidebar,
+  }) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    themeStore = MemoryThemeModeStore(saved);
+    theme = ThemeController(themeStore);
     await theme.load();
+    sidebarStore = MemorySidebarStateStore(remember: rememberSidebar);
+    sidebar = SidebarController(sidebarStore);
+    await sidebar.load();
+
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: SettingsScreen(theme: theme)),
+        home: Scaffold(
+          body: SettingsScreen(
+            theme: theme,
+            sidebar: sidebar,
+            appInfo: testAppInfo,
+          ),
+        ),
       ),
     );
   }
@@ -25,7 +46,21 @@ void main() {
   SegmentedButton<ThemeMode> picker(WidgetTester tester) =>
       tester.widget(find.byKey(const Key('settings.themeMode')));
 
-  testWidgets('shows the three choices with the current one selected',
+  SwitchListTile rememberSwitch(WidgetTester tester) =>
+      tester.widget(find.byKey(const Key('settings.rememberSidebar')));
+
+  testWidgets('shows Appearance above About', (tester) async {
+    await pumpSettings(tester);
+
+    final appearance = find.byKey(const Key('settings.appearance'));
+    final about = find.byKey(const Key('settings.about'));
+    expect(
+      tester.getTopLeft(appearance).dy,
+      lessThan(tester.getTopLeft(about).dy),
+    );
+  });
+
+  testWidgets('shows the three theme choices with the current one selected',
       (tester) async {
     await pumpSettings(tester);
 
@@ -36,7 +71,7 @@ void main() {
     expect(find.textContaining("computer's light or dark"), findsOneWidget);
   });
 
-  testWidgets('shows a saved choice as selected', (tester) async {
+  testWidgets('shows a saved theme choice as selected', (tester) async {
     await pumpSettings(tester, saved: ThemeMode.light);
 
     expect(picker(tester).selected, {ThemeMode.light});
@@ -50,12 +85,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(theme.mode, ThemeMode.dark);
-    expect(store.mode, ThemeMode.dark);
+    expect(themeStore.mode, ThemeMode.dark);
     expect(picker(tester).selected, {ThemeMode.dark});
     expect(find.text('Always dark.'), findsOneWidget);
   });
 
-  testWidgets('each choice is at least 48dp tall', (tester) async {
+  testWidgets('each theme choice is at least 48dp tall', (tester) async {
     await pumpSettings(tester);
 
     for (final label in ['System', 'Light', 'Dark']) {
@@ -66,5 +101,50 @@ void main() {
       expect(tester.getSize(segment.first).height,
           greaterThanOrEqualTo(AppTheme.minTouchTarget));
     }
+  });
+
+  testWidgets('remember sidebar state is on for a new installation',
+      (tester) async {
+    await pumpSettings(tester);
+
+    expect(rememberSwitch(tester).value, isTrue);
+    expect(find.text('Remember sidebar state'), findsOneWidget);
+  });
+
+  testWidgets('tapping the row turns remembering off and saves it',
+      (tester) async {
+    await pumpSettings(tester);
+
+    await tester.tap(find.text('Remember sidebar state'));
+    await tester.pumpAndSettle();
+
+    expect(sidebar.remember, isFalse);
+    expect(sidebarStore.remember, isFalse);
+    expect(rememberSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('shows a saved off choice', (tester) async {
+    await pumpSettings(tester, rememberSidebar: false);
+
+    expect(rememberSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('About shows the version and the server', (tester) async {
+    await pumpSettings(tester);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('settings.version')),
+        matching: find.text('1.0.0 (build 1)'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('settings.server')),
+        matching: find.text('https://api.test.example'),
+      ),
+      findsOneWidget,
+    );
   });
 }
