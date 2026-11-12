@@ -150,7 +150,9 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  // Cash Client opens maximised (owner decision). Restoring the window brings
+  // it back to the size passed to Create in main.cpp.
+  return ShowWindow(window_handle_, SW_SHOWMAXIMIZED);
 }
 
 // static

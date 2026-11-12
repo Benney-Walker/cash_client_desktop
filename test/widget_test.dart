@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:cash_client_desktop/main.dart';
+import 'package:cash_client_desktop/settings/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cash_client_desktop/main.dart';
+import 'support/fakes.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  Future<ThemeController> pumpApp(
+    WidgetTester tester, {
+    ThemeMode? saved,
+  }) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final theme = ThemeController(MemoryThemeModeStore(saved));
+    await theme.load();
+    await tester.pumpWidget(CashClientApp(theme: theme));
+    return theme;
+  }
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  MaterialApp app(WidgetTester tester) =>
+      tester.widget(find.byType(MaterialApp));
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('opens on the shell with the saved theme mode', (tester) async {
+    await pumpApp(tester, saved: ThemeMode.dark);
+
+    expect(app(tester).title, 'Cash Client');
+    expect(app(tester).themeMode, ThemeMode.dark);
+    expect(find.byKey(const Key('page.dashboard')), findsOneWidget);
+  });
+
+  testWidgets('changing the theme in settings applies to the whole app',
+      (tester) async {
+    await pumpApp(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    expect(app(tester).themeMode, ThemeMode.dark);
   });
 }
