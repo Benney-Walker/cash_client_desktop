@@ -60,7 +60,9 @@ sign-in exists and the role rules are confirmed.
 - **Font:** Inter, bundled so Windows and macOS look the same. The files are
   static instances generated from the Google Fonts release of Inter (optical
   size 14). Licence: `assets/fonts/inter/OFL.txt` (SIL Open Font License 1.1).
-- **Layout:** collapsible left sidebar, opening expanded.
+- **Layout:** collapsible left sidebar, opening expanded. Style chosen from
+  three previewed options: a light panel on the card colour, the selected
+  item highlighted with a soft indigo pill, Settings as the last item.
 - **Window:** opens maximised, and can't be made smaller than 1280×720.
   Restoring it on Windows gives 1280×720.
 - **Backend address:** fixed at build time with `--dart-define`, never
