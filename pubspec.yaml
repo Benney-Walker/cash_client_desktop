@@ -22,6 +22,8 @@ dependencies:
   # Reads the installed version for Settings > About. Flutter Community
   # "Plus" plugins; supports Windows and macOS.
   package_info_plus: ^10.2.0
+  # Calls to the backend; same version as the collector app.
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

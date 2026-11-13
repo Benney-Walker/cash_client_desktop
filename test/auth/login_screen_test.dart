@@ -11,7 +11,11 @@ void main() {
   late List<(String, String)> attempts;
   late Completer<String?> result;
 
-  Future<void> pumpLogin(WidgetTester tester, {ThemeData? theme}) async {
+  Future<void> pumpLogin(
+    WidgetTester tester, {
+    ThemeData? theme,
+    String? notice,
+  }) async {
     tester.view.physicalSize = const Size(1280, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -23,6 +27,7 @@ void main() {
         theme: theme ?? AppTheme.light,
         home: LoginScreen(
           appInfo: testAppInfo,
+          notice: notice,
           onSignIn: (staffId, password) {
             attempts.add((staffId, password));
             return result.future;
@@ -48,7 +53,8 @@ void main() {
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Cash Client'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Forgot password?'), findsOneWidget);
+    // Password reset is kept out of the app for now.
+    expect(find.text('Forgot password?'), findsNothing);
     expect(
       find.text('Version 1.0.0 (build 1) · Powered by Bynex Labs'),
       findsOneWidget,
@@ -175,13 +181,24 @@ void main() {
     expect(find.byTooltip('Hide password'), findsOneWidget);
   });
 
-  testWidgets('forgot password says it is not connected yet', (tester) async {
-    await pumpLogin(tester);
+  testWidgets('shows a notice until the next attempt', (tester) async {
+    await pumpLogin(tester, notice: 'Your session has ended.');
 
-    await tester.tap(find.byKey(const Key('login.forgotPassword')));
+    expect(find.byKey(const Key('login.notice')), findsOneWidget);
+    expect(find.text('Your session has ended.'), findsOneWidget);
+    expect(find.byIcon(Icons.info_outline), findsOneWidget);
+
+    await fillIn(tester, 'STF0012', 'secret123');
+    await tester.tap(signIn);
     await tester.pump();
 
-    expect(find.textContaining("isn't connected yet"), findsOneWidget);
+    expect(find.byKey(const Key('login.notice')), findsNothing);
+  });
+
+  testWidgets('shows no notice by default', (tester) async {
+    await pumpLogin(tester);
+
+    expect(find.byKey(const Key('login.notice')), findsNothing);
   });
 
   testWidgets('renders in dark mode too', (tester) async {

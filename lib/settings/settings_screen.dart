@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../auth/auth_session.dart';
 import '../common/gradient_backdrop.dart';
 import '../common/gradient_icon_tile.dart';
 import '../common/gradient_switch.dart';
+import '../common/initials_avatar.dart';
+import '../common/names.dart';
 import '../shell/section_page.dart';
 import '../shell/sidebar_controller.dart';
 import '../theme/app_gradients.dart';
@@ -13,17 +16,21 @@ import 'theme_controller.dart';
 /// Settings, laid out as one column of section cards (option A), styled as
 /// frosted glass cards over soft gradient glows (option S3).
 ///
-/// The agreed order is Account, Password, Appearance, About. Account and
-/// Password need sign-in, so they'll be added above Appearance when sign-in
-/// is built.
+/// The agreed order is Account, Password, Appearance, About. Password reset
+/// is kept out of the app for now (owner decision 13 November 2026), so
+/// there's no Password card.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,
+    required this.session,
+    required this.onSignOut,
     required this.theme,
     required this.sidebar,
     required this.appInfo,
   });
 
+  final AuthSession session;
+  final VoidCallback onSignOut;
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
@@ -39,6 +46,13 @@ class SettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _SettingsCard(
+                key: const Key('settings.account'),
+                title: 'Account',
+                icon: Icons.person_outline,
+                child: _AccountSection(session: session, onSignOut: onSignOut),
+              ),
+              const SizedBox(height: 16),
               _SettingsCard(
                 key: const Key('settings.appearance'),
                 title: 'Appearance',
@@ -101,6 +115,66 @@ class _SettingsCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Who is signed in, and Sign out.
+///
+/// The login response gives the name, staff ID and roles, but not the
+/// branch, and there's no endpoint for staff to read their own profile, so
+/// the branch isn't shown yet.
+class _AccountSection extends StatelessWidget {
+  const _AccountSection({required this.session, required this.onSignOut});
+
+  final AuthSession session;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final role = session.role;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            InitialsAvatar(name: session.staffName),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName(session.staffName),
+                    key: const Key('settings.staffName'),
+                    style: textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    [if (role != null) role.label, session.staffId]
+                        .join(' · '),
+                    key: const Key('settings.staffDetails'),
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Not a primary action, so an outlined button rather than the
+        // gradient one. No confirmation: signing back in is quick.
+        OutlinedButton.icon(
+          key: const Key('settings.signOut'),
+          onPressed: onSignOut,
+          icon: const Icon(Icons.logout),
+          label: const Text('Sign out'),
+        ),
+      ],
     );
   }
 }

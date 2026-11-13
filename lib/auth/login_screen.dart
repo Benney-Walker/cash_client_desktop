@@ -4,6 +4,7 @@ import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
 import '../settings/app_info.dart';
 import '../theme/app_gradients.dart';
+import '../theme/app_status_colors.dart';
 import 'sign_in_panel.dart';
 
 /// Tries to sign in. Returns null on success, or a message to show the user.
@@ -17,17 +18,24 @@ typedef SignInHandler = Future<String?> Function(
 /// bottom-right corner.
 ///
 /// It only collects the staff ID and password and reports the outcome;
-/// talking to the backend is up to [onSignIn]. That part waits for the
-/// backend review.
+/// talking to the backend is up to [onSignIn].
+///
+/// There's no "Forgot password?" link: password reset is kept out of the
+/// app for now (owner decision 13 November 2026).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     required this.appInfo,
     required this.onSignIn,
+    this.notice,
   });
 
   final AppInfo appInfo;
   final SignInHandler onSignIn;
+
+  /// Shown above the form until the next sign-in attempt, for example to
+  /// explain that the session ended.
+  final String? notice;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -40,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _busy = false;
   String? _error;
+  late bool _showNotice = widget.notice != null;
 
   @override
   void dispose() {
@@ -55,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _showNotice = false;
     });
     String? error;
     try {
@@ -68,14 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _busy = false;
       _error = error;
     });
-  }
-
-  void _forgotPassword() {
-    // Staff reset their own passwords on a web page provided by the backend.
-    // This will open that page in the browser once its address is known.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Password reset isn't connected yet.")),
-    );
   }
 
   @override
@@ -147,6 +149,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
+          if (_showNotice && widget.notice != null) ...[
+            _NoticeBanner(message: widget.notice!),
+            const SizedBox(height: 16),
+          ],
           if (error != null) ...[
             _ErrorBanner(message: error),
             const SizedBox(height: 16),
@@ -189,16 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
             validator: (value) =>
                 (value == null || value.isEmpty) ? 'Enter your password' : null,
           ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              key: const Key('login.forgotPassword'),
-              onPressed: _forgotPassword,
-              child: const Text('Forgot password?'),
-            ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
           GradientButton(
             key: const Key('login.signIn'),
             onPressed: _busy ? null : _submit,
@@ -256,6 +253,47 @@ class _ErrorBanner extends StatelessWidget {
                     .textTheme
                     .bodyMedium
                     ?.copyWith(color: scheme.onErrorContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A neutral message, such as "your session has ended". Not an error, so it
+/// uses the neutral status colours, with an icon as well as text.
+class _NoticeBanner extends StatelessWidget {
+  const _NoticeBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = AppStatusColors.of(context);
+
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const Key('login.notice'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: status.neutralContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, size: 20, color: status.neutral),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: status.neutral),
               ),
             ),
           ],

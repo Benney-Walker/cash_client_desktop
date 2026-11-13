@@ -1,3 +1,4 @@
+import 'package:cash_client_desktop/auth/auth_session.dart';
 import 'package:cash_client_desktop/common/gradient_switch.dart';
 import 'package:cash_client_desktop/settings/settings_screen.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
@@ -14,12 +15,16 @@ void main() {
   late MemorySidebarStateStore sidebarStore;
   late SidebarController sidebar;
 
+  late int signOuts;
+
   Future<void> pumpSettings(
     WidgetTester tester, {
     ThemeMode? saved,
     bool? rememberSidebar,
+    AuthSession session = adminSession,
   }) async {
-    tester.view.physicalSize = const Size(1280, 720);
+    // Tall enough that every card is on screen without scrolling.
+    tester.view.physicalSize = const Size(1280, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -30,11 +35,14 @@ void main() {
     sidebar = SidebarController(sidebarStore);
     await sidebar.load();
 
+    signOuts = 0;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
         home: Scaffold(
           body: SettingsScreen(
+            session: session,
+            onSignOut: () => signOuts++,
             theme: theme,
             sidebar: sidebar,
             appInfo: testAppInfo,
@@ -54,15 +62,46 @@ void main() {
         ),
       );
 
-  testWidgets('shows Appearance above About', (tester) async {
+  testWidgets('shows Account, Appearance and About in that order',
+      (tester) async {
     await pumpSettings(tester);
 
-    final appearance = find.byKey(const Key('settings.appearance'));
-    final about = find.byKey(const Key('settings.about'));
-    expect(
-      tester.getTopLeft(appearance).dy,
-      lessThan(tester.getTopLeft(about).dy),
+    double top(String key) => tester.getTopLeft(find.byKey(Key(key))).dy;
+    expect(top('settings.account'), lessThan(top('settings.appearance')));
+    expect(top('settings.appearance'), lessThan(top('settings.about')));
+    // Password reset is kept out of the app for now.
+    expect(find.text('Password'), findsNothing);
+  });
+
+  testWidgets('Account shows the name, role and staff ID', (tester) async {
+    await pumpSettings(tester);
+
+    expect(find.text('Kofi Mensah'), findsOneWidget);
+    expect(find.text('Administrator · STF0012'), findsOneWidget);
+    expect(find.text('KM'), findsOneWidget);
+  });
+
+  testWidgets('Account shows Agent for an agent', (tester) async {
+    await pumpSettings(
+      tester,
+      session: const AuthSession(
+        staffId: 'STF0020',
+        staffName: 'EFUA ASANTE',
+        roles: ['AGENT'],
+        accessToken: 'a',
+        refreshToken: 'r',
+      ),
     );
+
+    expect(find.text('Agent · STF0020'), findsOneWidget);
+  });
+
+  testWidgets('Sign out calls back', (tester) async {
+    await pumpSettings(tester);
+
+    await tester.tap(find.byKey(const Key('settings.signOut')));
+
+    expect(signOuts, 1);
   });
 
   testWidgets('shows the three theme choices with the current one selected',

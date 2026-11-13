@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../auth/auth_session.dart';
 import '../common/brand_mark.dart';
 import '../common/gradient_backdrop.dart';
 import '../settings/app_info.dart';
@@ -15,11 +16,15 @@ import 'sidebar_controller.dart';
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
+    required this.session,
+    required this.onSignOut,
     required this.theme,
     required this.sidebar,
     required this.appInfo,
   });
 
+  final AuthSession session;
+  final VoidCallback onSignOut;
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
@@ -88,6 +93,8 @@ class _AppShellState extends State<AppShell> {
 
   Widget _page(AppSection section) => switch (section) {
         AppSection.settings => SettingsScreen(
+            session: widget.session,
+            onSignOut: widget.onSignOut,
             theme: widget.theme,
             sidebar: widget.sidebar,
             appInfo: widget.appInfo,

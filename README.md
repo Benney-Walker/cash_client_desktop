@@ -25,17 +25,10 @@ flutter test
 ```
 
 The backend address is fixed per build, as in the mobile app:
-`--dart-define=API_BASE_URL=https://…`. The app doesn't call the backend
-yet; Settings > About shows the address (or "Not set for this build").
-
-To look at the sign-in screen before it's connected:
-
-```sh
-flutter run -d windows --dart-define=PREVIEW_LOGIN=true
-```
-
-Signing in there always ends with "Sign-in isn't connected to the backend
-yet." This switch is temporary and goes once sign-in is wired up.
+`--dart-define=API_BASE_URL=https://…` (for a local backend,
+`http://localhost:8080`). Settings > About shows the address (or "Not set
+for this build"). Without it, signing in says the build has no server
+address.
 
 ## Status
 
@@ -45,10 +38,10 @@ yet." This switch is temporary and goes once sign-in is wired up.
 | Font | ✅ Inter bundled (Regular, Medium, SemiBold, Bold) |
 | Window | ✅ Opens maximised on Windows and macOS; minimum size 1280×720 |
 | Sidebar shell | ✅ Collapsible left sidebar on the light gradient panel (D3), glass highlight on the selected item, state remembered between launches (can be turned off); every section is a placeholder |
-| Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Appearance (light/dark, remember sidebar state) and About (version, server). Account and Password cards come with sign-in |
-| Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. Not connected to the backend yet; preview with `--dart-define=PREVIEW_LOGIN=true` |
-| Sign-in and session | Not started: waits for the backend review |
-| Lock after 10 minutes idle | Not started: needs sign-in |
+| Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Account (name, role, staff ID, Sign out), Appearance (light/dark, remember sidebar state) and About (version, server). No Password card while reset is kept out of the app |
+| Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. No "Forgot password?" (password reset kept out of the app for now) |
+| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/login`; only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
+| Inactivity lock (10 minutes) | Waiting for the lock screen design choice |
 | Dashboard and all business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -85,7 +78,12 @@ sign-in exists and the role rules are confirmed.
   Restoring it on Windows gives 1280×720.
 - **Backend address:** fixed at build time with `--dart-define`, never
   editable in the app.
-- **Idle lock:** after 10 minutes without activity (to be built with sign-in).
+- **Sessions:** staff sign in each time the app opens; tokens live in
+  memory only and are never written to disk. Staff who are neither
+  Administrator nor Agent are refused; someone with both is treated as an
+  Administrator. These checks only shape the app; the backend enforces
+  permissions on every request.
+- **Idle lock:** after 10 minutes without activity (design being chosen).
 - **Settings:** one column of section cards, in the order Account, Password,
   Appearance, About, styled as frosted glass cards over soft gradient glows
   (option S3) with gradient icon tiles. "Remember sidebar state" is on by default, following
@@ -104,7 +102,8 @@ sign-in exists and the role rules are confirmed.
 ```
 lib/
   main.dart            app start-up
-  auth/                sign-in screen, its panel and illustration
+  api/                 backend errors, the authenticated HTTP client
+  auth/                sign-in API, session, gate, sign-in screen
   common/              shared widgets (gradient button, brand mark)
   config/              build-time settings (--dart-define)
   shell/               sidebar, its remembered state, sections, page layout
@@ -124,19 +123,26 @@ test/                  mirrors lib/
   Appearance card with the remember-sidebar switch, About card with version
   and server. Added `package_info_plus`.
 - **2026-11-12** Sign-in screen (light A1) built, not yet connected. Lighter
-  gradient tints and the gradient primary button added. Temporary
-  `PREVIEW_LOGIN` switch to view it.
+  gradient tints and the gradient primary button added.
 - **2026-11-12** Sidebar moved onto the light gradient panel (D3); Settings
   restyled as glass cards on gradient glows (S3); gradient switch and icon
   tiles. Dashboard body waits for its contents to be decided.
+- **2026-11-13** Sign-in connected to the backend: login, role check,
+  automatic token refresh with one retry, session ending, sign-in gate,
+  Account card with Sign out. Same API layer as the collector app.
+  "Forgot password?" removed. Added `http`.
 
 ## Known limitations
 
 - The tests and `flutter analyze` haven't been run yet. The environment this
   was written in couldn't download the Flutter SDK or packages. Run
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
-  `pubspec.lock` will update to add `shared_preferences` and
-  `package_info_plus`.
+  `pubspec.lock` will update to add `shared_preferences`,
+  `package_info_plus` and `http`.
+- Signing out only forgets the tokens in the app; the backend has no logout
+  endpoint, so they stay valid until they expire.
+- The Account card can't show the branch: the login response doesn't
+  include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.
 - The macOS menu bar still shows the project name `cash_client_desktop`.
   Changing the product name affects the bundle identifier and is left for

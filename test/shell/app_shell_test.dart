@@ -25,6 +25,8 @@ void main() {
       MaterialApp(
         theme: AppTheme.light,
         home: AppShell(
+          session: adminSession,
+          onSignOut: () {},
           theme: ThemeController(MemoryThemeModeStore()),
           sidebar: sidebar,
           appInfo: testAppInfo,
