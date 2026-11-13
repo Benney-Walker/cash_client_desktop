@@ -41,7 +41,7 @@ address.
 | Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Account (name, role, staff ID, Sign out), Appearance (light/dark, remember sidebar state) and About (version, server). No Password card while reset is kept out of the app |
 | Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. No "Forgot password?" (password reset kept out of the app for now) |
 | Sign-in and session | ✅ Signs in with `POST /api/auth/v1/login`; only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
-| Inactivity lock (10 minutes) | Waiting for the lock screen design choice |
+| Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Dashboard and all business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -83,7 +83,10 @@ sign-in exists and the role rules are confirmed.
   Administrator nor Agent are refused; someone with both is treated as an
   Administrator. These checks only shape the app; the backend enforces
   permissions on every request.
-- **Idle lock:** after 10 minutes without activity (design being chosen).
+- **Idle lock:** after 20 minutes without mouse or keyboard activity (changed
+  from 10 on 2026-11-13), option L1: the app stays visible but dimmed and
+  out of reach behind a lock card showing the staff member's name, role and
+  staff ID, a password field, Unlock and "Not you? Sign out".
 - **Settings:** one column of section cards, in the order Account, Password,
   Appearance, About, styled as frosted glass cards over soft gradient glows
   (option S3) with gradient icon tiles. "Remember sidebar state" is on by default, following
@@ -131,6 +134,7 @@ test/                  mirrors lib/
   automatic token refresh with one retry, session ending, sign-in gate,
   Account card with Sign out. Same API layer as the collector app.
   "Forgot password?" removed. Added `http`.
+- **2026-11-13** Inactivity lock (L1, 20 minutes).
 
 ## Known limitations
 

@@ -1,3 +1,4 @@
+import 'package:cash_client_desktop/theme/app_colors.dart';
 import 'package:cash_client_desktop/theme/app_gradients.dart';
 import 'package:cash_client_desktop/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -111,6 +112,31 @@ void main() {
       });
     });
   }
+
+  test('lock card text is readable whatever the app shows behind it', () {
+    for (final (theme, scrim, card) in [
+      (AppTheme.light, AppColors.lightLockScrim, AppColors.lightLockCard),
+      (AppTheme.dark, AppColors.darkLockScrim, AppColors.darkLockCard),
+    ]) {
+      final scheme = theme.colorScheme;
+      // The darkest and lightest things the app could be showing.
+      for (final behind in [const Color(0xFF000000), const Color(0xFFFFFFFF)]) {
+        final background =
+            Color.alphaBlend(card, Color.alphaBlend(scrim, behind));
+        for (final text in [scheme.onSurface, scheme.onSurfaceVariant]) {
+          expect(
+            contrastRatio(text, background),
+            greaterThanOrEqualTo(minTextContrast),
+            reason: '$text on $background',
+          );
+        }
+        expect(
+          contrastRatio(scheme.outline, background),
+          greaterThanOrEqualTo(minUiContrast),
+        );
+      }
+    }
+  });
 
   test('switching theme mode blends without errors', () {
     final mid = AppGradients.light.lerp(AppGradients.dark, 0.5);

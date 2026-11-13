@@ -150,4 +150,11 @@ abstract final class AppColors {
   // The dark card colour at 75%, with a faint white border.
   static const darkGlassCard = Color(0xBF141A2A);
   static const darkGlassCardBorder = Color(0x38FFFFFF);
+
+  // Inactivity lock (option L1): a dim layer over the app and a nearly
+  // opaque card, so its text stays readable whatever is behind it.
+  static const lightLockScrim = Color(0x590F172A); // slate at 35%
+  static const lightLockCard = Color(0xF0FFFFFF); // white at 94%
+  static const darkLockScrim = Color(0x8C000000); // black at 55%
+  static const darkLockCard = Color(0xF0141A2A); // card colour at 94%
 }

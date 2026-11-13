@@ -1,3 +1,4 @@
+import 'package:cash_client_desktop/auth/inactivity_lock.dart';
 import 'package:cash_client_desktop/auth/session_manager.dart';
 import 'package:cash_client_desktop/main.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
@@ -36,6 +37,7 @@ void main() {
     await tester.pumpWidget(
       CashClientApp(
         sessions: sessions,
+        lock: InactivityLock(),
         theme: theme,
         sidebar: sidebar,
         appInfo: testAppInfo,

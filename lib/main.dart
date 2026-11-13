@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'auth/auth_api.dart';
 import 'auth/auth_gate.dart';
+import 'auth/inactivity_lock.dart';
+import 'auth/lock_layer.dart';
 import 'auth/session_manager.dart';
 import 'config/app_config.dart';
 import 'settings/app_info.dart';
@@ -30,6 +32,7 @@ Future<void> main() async {
 
   runApp(CashClientApp(
     sessions: sessions,
+    lock: InactivityLock(),
     theme: theme,
     sidebar: sidebar,
     appInfo: appInfo,
@@ -40,12 +43,14 @@ class CashClientApp extends StatelessWidget {
   const CashClientApp({
     super.key,
     required this.sessions,
+    required this.lock,
     required this.theme,
     required this.sidebar,
     required this.appInfo,
   });
 
   final SessionManager sessions;
+  final InactivityLock lock;
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
@@ -60,6 +65,9 @@ class CashClientApp extends StatelessWidget {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: theme.mode,
+        // Above the navigator, so the lock covers dialogs as well as pages.
+        builder: (context, child) =>
+            LockLayer(sessions: sessions, lock: lock, child: child!),
         home: AuthGate(
           sessions: sessions,
           theme: theme,
