@@ -47,7 +47,9 @@ address.
 ### Sidebar sections
 
 Dashboard, Members, Withdrawals, Collectors, Daily submissions, Loans, Staff,
-Settings. The grouping and order are a first proposal. No section except
+Settings. The grouping and order are a first proposal. Withdrawals means
+member withdrawals recorded at the office; collector withdrawal requests
+were removed from the system on 2026-11-15. No section except
 Settings has screens yet, and every section is shown to everyone until
 sign-in exists and the role rules are confirmed.
 
