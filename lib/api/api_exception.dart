@@ -19,6 +19,13 @@ enum ApiFailure {
   /// 400: the backend rejected the request's fields.
   validation,
 
+  /// 404: the thing asked for doesn't exist.
+  notFound,
+
+  /// 409: the request clashes with what's already there, such as a phone
+  /// number another staff member uses.
+  conflict,
+
   /// 5xx.
   server,
 
@@ -43,6 +50,8 @@ class ApiException implements Exception {
       400 => ApiFailure.validation,
       401 => ApiFailure.unauthorized,
       403 => ApiFailure.forbidden,
+      404 => ApiFailure.notFound,
+      409 => ApiFailure.conflict,
       >= 500 => ApiFailure.server,
       _ => ApiFailure.unexpectedResponse,
     };

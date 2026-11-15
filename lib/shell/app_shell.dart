@@ -6,6 +6,8 @@ import '../common/gradient_backdrop.dart';
 import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
 import '../settings/theme_controller.dart';
+import '../staff/staff_api.dart';
+import '../staff/staff_page.dart';
 import '../theme/app_gradients.dart';
 import 'app_section.dart';
 import 'section_page.dart';
@@ -18,6 +20,7 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.session,
     required this.onSignOut,
+    required this.staffApi,
     required this.theme,
     required this.sidebar,
     required this.appInfo,
@@ -25,6 +28,7 @@ class AppShell extends StatefulWidget {
 
   final AuthSession session;
   final VoidCallback onSignOut;
+  final StaffApi staffApi;
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
@@ -92,6 +96,10 @@ class _AppShellState extends State<AppShell> {
       expanded ? Icon(icon) : Tooltip(message: label, child: Icon(icon));
 
   Widget _page(AppSection section) => switch (section) {
+        AppSection.staff => StaffPage(
+            session: widget.session,
+            api: widget.staffApi,
+          ),
         AppSection.settings => SettingsScreen(
             session: widget.session,
             onSignOut: widget.onSignOut,

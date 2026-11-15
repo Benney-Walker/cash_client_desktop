@@ -42,15 +42,16 @@ address.
 | Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. No "Forgot password?" (password reset kept out of the app for now) |
 | Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
-| Dashboard and all business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
+| Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
+| Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
 
 Dashboard, Members, Withdrawals, Collectors, Daily submissions, Loans, Staff,
 Settings. The grouping and order are a first proposal. Withdrawals means
 member withdrawals recorded at the office; collector withdrawal requests
-were removed from the system on 2026-11-15. No section except
-Settings has screens yet, and every section is shown to both roles until
+were removed from the system on 2026-11-15. Only Settings and Staff
+(Add staff) have screens so far, and every section is shown to both roles until
 each section's role rules are confirmed.
 
 ## Design decisions
@@ -107,6 +108,7 @@ each section's role rules are confirmed.
 ```
 lib/
   main.dart            app start-up
+  staff/               Staff page, Add staff steps, staff API and models
   api/                 backend errors, the authenticated HTTP client
   auth/                sign-in API, session, gate, sign-in screen
   common/              shared widgets (gradient button, brand mark)
@@ -140,6 +142,8 @@ test/                  mirrors lib/
 - **2026-11-15** Sign-in follows the backend's renamed endpoints
   (`staff-login`, `refresh-staff-token`); a 403 from the office login
   explains that the app is for administrators and agents.
+- **2026-11-15** Add staff (F3, four steps). API failure types for 404 and
+  409, shared with the collector app.
 
 ## Known limitations
 
@@ -150,6 +154,11 @@ test/                  mirrors lib/
   `package_info_plus` and `http`.
 - Signing out only forgets the tokens in the app; the backend has no logout
   endpoint, so they stay valid until they expire.
+- Add staff can't be used end to end until the backend (a) stops
+  requiring a password on add-staff and generates a default one, and (b)
+  offers a branch list. The app calls `GET /api/branch/v1/all`, a proposed
+  path (CASH_CLIENT_DESKTOP.md section 16); without it the branch step says
+  the list isn't offered yet.
 - The Account card can't show the branch: the login response doesn't
   include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.

@@ -27,6 +27,7 @@ void main() {
         home: AppShell(
           session: adminSession,
           onSignOut: () {},
+          staffApi: FakeStaffBackend().api,
           theme: ThemeController(MemoryThemeModeStore()),
           sidebar: sidebar,
           appInfo: testAppInfo,
@@ -74,6 +75,16 @@ void main() {
     await pumpShell(tester);
 
     expect(find.text('Not built yet'), findsOneWidget);
+  });
+
+  testWidgets('Staff opens the staff page with Add staff', (tester) async {
+    await pumpShell(tester);
+
+    await tester.tap(find.text('Staff'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('page.staff')), findsOneWidget);
+    expect(find.byKey(const Key('staff.add')), findsOneWidget);
   });
 
   testWidgets('settings opens the theme choice', (tester) async {

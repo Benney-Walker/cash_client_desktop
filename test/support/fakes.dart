@@ -5,6 +5,7 @@ import 'package:cash_client_desktop/auth/auth_session.dart';
 import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
 import 'package:cash_client_desktop/shell/sidebar_state_store.dart';
+import 'package:cash_client_desktop/staff/staff_api.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -160,3 +161,49 @@ const adminSession = AuthSession(
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
 );
+
+/// A staff backend: lists [branches] and answers add-staff with
+/// [addStatus] and [addBody]. [requests] collects what the app sent.
+class FakeStaffBackend {
+  FakeStaffBackend({
+    this.branchesStatus = 200,
+    this.addStatus = 200,
+    this.addBody = '',
+  });
+
+  int branchesStatus;
+  int addStatus;
+  String addBody;
+  final requests = <http.Request>[];
+
+  String branches = jsonEncode([
+    {'id': 'b-tarkwa', 'name': 'Tarkwa', 'location': 'Tarkwa Market'},
+    {'id': 'b-accra', 'name': 'Accra', 'location': null},
+  ]);
+
+  late final StaffApi api = StaffApi(
+    baseUrl: testBaseUrl,
+    client: MockClient((request) async {
+      requests.add(request);
+      if (request.url.path.endsWith(StaffApi.branchesPath)) {
+        return http.Response(
+          branchesStatus == 200
+              ? branches
+              : errorBody(branchesStatus, 'Not found'),
+          branchesStatus,
+        );
+      }
+      if (request.url.path.endsWith('/api/staff/v1/add-staff')) {
+        return http.Response(addBody, addStatus);
+      }
+      return http.Response(errorBody(404, 'Not found'), 404);
+    }),
+  );
+
+  /// The JSON body of the last add-staff request.
+  Map<String, dynamic> get lastAdd => jsonDecode(
+        requests
+            .lastWhere((r) => r.url.path.endsWith('/add-staff'))
+            .body,
+      ) as Map<String, dynamic>;
+}

@@ -20,6 +20,8 @@ String signInErrorMessage(Object error) {
         "Couldn't reach the server. Check your connection and try again.",
       ApiFailure.validation =>
         error.message ?? 'Check your staff ID and password.',
+      ApiFailure.notFound || ApiFailure.conflict =>
+        error.message ?? 'Something went wrong. Try again.',
       ApiFailure.server =>
         'The server had a problem. Try again in a few minutes.',
       ApiFailure.notConfigured =>

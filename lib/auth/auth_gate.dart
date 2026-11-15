@@ -4,6 +4,7 @@ import '../settings/app_info.dart';
 import '../settings/theme_controller.dart';
 import '../shell/app_shell.dart';
 import '../shell/sidebar_controller.dart';
+import '../staff/staff_api.dart';
 import 'login_screen.dart';
 import 'session_manager.dart';
 import 'sign_in.dart';
@@ -14,12 +15,14 @@ class AuthGate extends StatefulWidget {
   const AuthGate({
     super.key,
     required this.sessions,
+    required this.staffApi,
     required this.theme,
     required this.sidebar,
     required this.appInfo,
   });
 
   final SessionManager sessions;
+  final StaffApi staffApi;
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
@@ -88,6 +91,7 @@ class _AuthGateState extends State<AuthGate> {
         return AppShell(
           session: session,
           onSignOut: sessions.signOut,
+          staffApi: widget.staffApi,
           theme: widget.theme,
           sidebar: widget.sidebar,
           appInfo: widget.appInfo,

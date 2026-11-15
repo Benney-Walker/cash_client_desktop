@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_session.dart';
 import '../common/gradient_backdrop.dart';
-import '../common/gradient_icon_tile.dart';
+import '../common/glass_card.dart';
 import '../common/gradient_switch.dart';
 import '../common/initials_avatar.dart';
 import '../common/names.dart';
 import '../shell/section_page.dart';
 import '../shell/sidebar_controller.dart';
-import '../theme/app_gradients.dart';
-import '../theme/app_theme.dart';
 import 'app_info.dart';
 import 'theme_controller.dart';
 
@@ -46,21 +44,21 @@ class SettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _SettingsCard(
+              GlassCard(
                 key: const Key('settings.account'),
                 title: 'Account',
                 icon: Icons.person_outline,
                 child: _AccountSection(session: session, onSignOut: onSignOut),
               ),
               const SizedBox(height: 16),
-              _SettingsCard(
+              GlassCard(
                 key: const Key('settings.appearance'),
                 title: 'Appearance',
                 icon: Icons.palette_outlined,
                 child: _AppearanceSection(theme: theme, sidebar: sidebar),
               ),
               const SizedBox(height: 16),
-              _SettingsCard(
+              GlassCard(
                 key: const Key('settings.about'),
                 title: 'About',
                 icon: Icons.info_outline,
@@ -70,51 +68,6 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// A frosted card: semi-transparent so the page glows show through, with a
-/// gradient icon tile beside the title.
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    super.key,
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final gradients = AppGradients.of(context);
-
-    return Card(
-      color: gradients.glassCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        side: BorderSide(color: gradients.glassCardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                GradientIconTile(icon: icon),
-                const SizedBox(width: 10),
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
-      ),
     );
   }
 }
