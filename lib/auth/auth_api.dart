@@ -21,7 +21,8 @@ class AuthApi {
   final http.Client _client;
   final Duration timeout;
 
-  /// `POST /api/auth/v1/login`.
+  /// `POST /api/auth/v1/staff-login` (the office endpoint; collectors have
+  /// their own and get 403 here).
   ///
   /// Throws [ApiException]. Any staff member can sign in here; checking that
   /// they're an administrator or agent is the caller's job, because the
@@ -31,7 +32,7 @@ class AuthApi {
     required String password,
   }) async {
     final response = await _post(
-      '/api/auth/v1/login',
+      '/api/auth/v1/staff-login',
       {'staffId': staffId, 'password': password},
     );
     final json = _jsonObject(response.body);
@@ -43,7 +44,7 @@ class AuthApi {
     return session;
   }
 
-  /// `POST /api/auth/v1/refresh-token`. Returns a new access token.
+  /// `POST /api/auth/v1/refresh-staff-token`. Returns a new access token.
   ///
   /// The backend answers with the bare token as the response body, not a
   /// JSON object (contract as of 12 Nov 2026). Because the app asks for
@@ -56,7 +57,7 @@ class AuthApi {
   /// the staff member has to sign in again.
   Future<String> refreshAccessToken(String refreshToken) async {
     final response = await _post(
-      '/api/auth/v1/refresh-token',
+      '/api/auth/v1/refresh-staff-token',
       {'refreshToken': refreshToken},
     );
     final accessToken = _bareToken(response.body);

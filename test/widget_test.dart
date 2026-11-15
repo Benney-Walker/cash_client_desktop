@@ -83,6 +83,18 @@ void main() {
     expect(find.byKey(const Key('shell.sidebar')), findsNothing);
   });
 
+  testWidgets('a 403 from the office login is explained the same way',
+      (tester) async {
+    await pumpApp(tester, loginStatus: 403);
+
+    await signIn(tester);
+
+    expect(
+      find.textContaining('This app is for administrators and agents'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a collector is told the app is for office staff',
       (tester) async {
     await pumpApp(tester, roles: ['COLLECTOR']);

@@ -40,7 +40,7 @@ address.
 | Sidebar shell | ✅ Collapsible left sidebar on the light gradient panel (D3), glass highlight on the selected item, state remembered between launches (can be turned off); every section is a placeholder |
 | Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Account (name, role, staff ID, Sign out), Appearance (light/dark, remember sidebar state) and About (version, server). No Password card while reset is kept out of the app |
 | Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. No "Forgot password?" (password reset kept out of the app for now) |
-| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/login`; only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
+| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Dashboard and all business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
@@ -137,6 +137,9 @@ test/                  mirrors lib/
   Account card with Sign out. Same API layer as the collector app.
   "Forgot password?" removed. Added `http`.
 - **2026-11-13** Inactivity lock (L1, 20 minutes).
+- **2026-11-15** Sign-in follows the backend's renamed endpoints
+  (`staff-login`, `refresh-staff-token`); a 403 from the office login
+  explains that the app is for administrators and agents.
 
 ## Known limitations
 

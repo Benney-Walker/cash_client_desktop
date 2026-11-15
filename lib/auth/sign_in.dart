@@ -8,16 +8,14 @@ class NotOfficeStaffException implements Exception {
 
 /// What to tell the staff member when sign-in fails.
 String signInErrorMessage(Object error) {
-  if (error is NotOfficeStaffException) {
-    return 'This app is for administrators and agents. Collectors use the '
-        'mobile app.';
-  }
+  if (error is NotOfficeStaffException) return _notOfficeStaff;
   if (error is ApiException) {
     return switch (error.failure) {
       // The backend says "Invalid ID or password" for a wrong staff ID, a
       // wrong password and an inactive account alike, on purpose.
       ApiFailure.unauthorized => 'Wrong staff ID or password.',
-      ApiFailure.forbidden => "Your account can't sign in to this app.",
+      // The office login endpoint answers 403 for collector accounts.
+      ApiFailure.forbidden => _notOfficeStaff,
       ApiFailure.network =>
         "Couldn't reach the server. Check your connection and try again.",
       ApiFailure.validation =>
@@ -33,6 +31,10 @@ String signInErrorMessage(Object error) {
   }
   return 'Something went wrong. Try again.';
 }
+
+const _notOfficeStaff =
+    'This app is for administrators and agents. Collectors use the mobile '
+    'app.';
 
 /// Shown on the sign-in screen after the backend ended the session, so the
 /// staff member knows why they're back there.

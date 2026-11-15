@@ -204,6 +204,11 @@ void main() {
         signInErrorMessage(const ApiException(ApiFailure.unauthorized)),
         'Wrong staff ID or password.',
       );
+      // The office login endpoint answers 403 for collectors.
+      expect(
+        signInErrorMessage(const ApiException(ApiFailure.forbidden)),
+        contains('administrators and agents'),
+      );
     });
   });
 }

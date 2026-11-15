@@ -25,7 +25,7 @@ void main() {
 
       final request = requests.single;
       expect(request.method, 'POST');
-      expect(request.url.toString(), '$testBaseUrl/api/auth/v1/login');
+      expect(request.url.toString(), '$testBaseUrl/api/auth/v1/staff-login');
       expect(request.headers['Content-Type'], startsWith('application/json'));
       expect(jsonDecode(request.body), {
         'staffId': 'STF001',
@@ -49,8 +49,10 @@ void main() {
     test('works with a trailing slash or a path prefix on the base URL',
         () async {
       for (final (base, expected) in [
-        ('https://api.example.test/', 'https://api.example.test/api/auth/v1/login'),
-        ('https://example.test/bank', 'https://example.test/bank/api/auth/v1/login'),
+        ('https://api.example.test/',
+            'https://api.example.test/api/auth/v1/staff-login'),
+        ('https://example.test/bank',
+            'https://example.test/bank/api/auth/v1/staff-login'),
       ]) {
         Uri? called;
         final api = AuthApi(
@@ -147,7 +149,7 @@ void main() {
 
       expect(token, jwt);
       expect(requests.single.url.toString(),
-          '$testBaseUrl/api/auth/v1/refresh-token');
+          '$testBaseUrl/api/auth/v1/refresh-staff-token');
       expect(jsonDecode(requests.single.body),
           {'refreshToken': 'refresh-token'});
     });
