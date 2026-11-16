@@ -1,0 +1,177 @@
+import 'package:flutter/material.dart';
+
+import 'app_colors.dart';
+
+/// The lighter gradients: the sidebar and sign-in panel, the illustration
+/// and glass labels, the soft page glows with frosted cards, and the
+/// gradient used for primary buttons, switches and icon tiles.
+///
+/// Read it with `AppGradients.of(context)`. Light and dark instances are
+/// registered on the matching [ThemeData].
+@immutable
+class AppGradients extends ThemeExtension<AppGradients> {
+  const AppGradients({
+    required this.button,
+    required this.onButton,
+    required this.panel,
+    required this.panelGlows,
+    required this.panelText,
+    required this.panelTextSecondary,
+    required this.illustration,
+    required this.glassFill,
+    required this.glassBorder,
+    required this.glassCard,
+    required this.glassCardBorder,
+    required this.pageGlows,
+  });
+
+  /// Primary buttons. Owner decision: every primary button in the desktop
+  /// app uses the gradient (see [GradientButton]).
+  final LinearGradient button;
+  final Color onButton;
+
+  /// The sign-in panel's base wash; [panelGlows] are drawn over it as soft
+  /// radial spots.
+  final LinearGradient panel;
+  final List<Color> panelGlows;
+  final Color panelText;
+  final Color panelTextSecondary;
+
+  /// Fill for the shield and other illustrations on the panel.
+  final LinearGradient illustration;
+
+  /// Translucent "glass" labels and rings on the panel.
+  final Color glassFill;
+  final Color glassBorder;
+
+  /// Frosted cards laid over [pageGlows], such as the Settings cards.
+  final Color glassCard;
+  final Color glassCardBorder;
+
+  /// Faint radial spots behind the sign-in form and Settings.
+  final List<Color> pageGlows;
+
+  static const light = AppGradients(
+    button: LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: AppColors.lightButtonStops,
+    ),
+    onButton: AppColors.lightOnButton,
+    panel: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: AppColors.lightPanelStops,
+    ),
+    panelGlows: AppColors.lightPanelGlows,
+    panelText: AppColors.lightPanelText,
+    panelTextSecondary: AppColors.lightPanelTextSecondary,
+    illustration: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: AppColors.lightIllustrationStops,
+    ),
+    glassFill: AppColors.lightGlassFill,
+    glassBorder: AppColors.lightGlassBorder,
+    glassCard: AppColors.lightGlassCard,
+    glassCardBorder: AppColors.lightGlassCardBorder,
+    pageGlows: AppColors.lightPageGlows,
+  );
+
+  static const dark = AppGradients(
+    button: LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: AppColors.darkButtonStops,
+    ),
+    onButton: AppColors.darkOnButton,
+    panel: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: AppColors.darkPanelStops,
+    ),
+    panelGlows: AppColors.darkPanelGlows,
+    panelText: AppColors.darkPanelText,
+    panelTextSecondary: AppColors.darkPanelTextSecondary,
+    illustration: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: AppColors.darkIllustrationStops,
+    ),
+    glassFill: AppColors.darkGlassFill,
+    glassBorder: AppColors.darkGlassBorder,
+    glassCard: AppColors.darkGlassCard,
+    glassCardBorder: AppColors.darkGlassCardBorder,
+    pageGlows: AppColors.darkPageGlows,
+  );
+
+  static AppGradients of(BuildContext context) =>
+      Theme.of(context).extension<AppGradients>()!;
+
+  @override
+  AppGradients copyWith({
+    LinearGradient? button,
+    Color? onButton,
+    LinearGradient? panel,
+    List<Color>? panelGlows,
+    Color? panelText,
+    Color? panelTextSecondary,
+    LinearGradient? illustration,
+    Color? glassFill,
+    Color? glassBorder,
+    Color? glassCard,
+    Color? glassCardBorder,
+    List<Color>? pageGlows,
+  }) {
+    return AppGradients(
+      button: button ?? this.button,
+      onButton: onButton ?? this.onButton,
+      panel: panel ?? this.panel,
+      panelGlows: panelGlows ?? this.panelGlows,
+      panelText: panelText ?? this.panelText,
+      panelTextSecondary: panelTextSecondary ?? this.panelTextSecondary,
+      illustration: illustration ?? this.illustration,
+      glassFill: glassFill ?? this.glassFill,
+      glassBorder: glassBorder ?? this.glassBorder,
+      glassCard: glassCard ?? this.glassCard,
+      glassCardBorder: glassCardBorder ?? this.glassCardBorder,
+      pageGlows: pageGlows ?? this.pageGlows,
+    );
+  }
+
+  // Lets the gradients animate when the app switches theme mode. Gradients
+  // with different stop counts can't blend, so those switch at the midpoint.
+  @override
+  AppGradients lerp(ThemeExtension<AppGradients>? other, double t) {
+    if (other is! AppGradients) return this;
+    return AppGradients(
+      button: _lerpGradient(button, other.button, t),
+      onButton: Color.lerp(onButton, other.onButton, t)!,
+      panel: _lerpGradient(panel, other.panel, t),
+      panelGlows: _lerpColors(panelGlows, other.panelGlows, t),
+      panelText: Color.lerp(panelText, other.panelText, t)!,
+      panelTextSecondary:
+          Color.lerp(panelTextSecondary, other.panelTextSecondary, t)!,
+      illustration: _lerpGradient(illustration, other.illustration, t),
+      glassFill: Color.lerp(glassFill, other.glassFill, t)!,
+      glassBorder: Color.lerp(glassBorder, other.glassBorder, t)!,
+      glassCard: Color.lerp(glassCard, other.glassCard, t)!,
+      glassCardBorder: Color.lerp(glassCardBorder, other.glassCardBorder, t)!,
+      pageGlows: _lerpColors(pageGlows, other.pageGlows, t),
+    );
+  }
+
+  static LinearGradient _lerpGradient(
+    LinearGradient a,
+    LinearGradient b,
+    double t,
+  ) {
+    if (a.colors.length != b.colors.length) return t < 0.5 ? a : b;
+    return LinearGradient.lerp(a, b, t)!;
+  }
+
+  static List<Color> _lerpColors(List<Color> a, List<Color> b, double t) {
+    if (a.length != b.length) return t < 0.5 ? a : b;
+    return [for (var i = 0; i < a.length; i++) Color.lerp(a[i], b[i], t)!];
+  }
+}
