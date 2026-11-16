@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:cash_client_desktop/api/apis.dart';
 import 'package:cash_client_desktop/auth/auth_api.dart';
 import 'package:cash_client_desktop/auth/auth_session.dart';
+import 'package:cash_client_desktop/branches/branch_api.dart';
+import 'package:cash_client_desktop/members/member_api.dart';
 import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
 import 'package:cash_client_desktop/shell/sidebar_state_store.dart';
@@ -162,6 +166,12 @@ const adminSession = AuthSession(
   refreshToken: 'refresh-token',
 );
 
+/// The branch list a fake backend sends.
+String defaultBranchesJson() => jsonEncode([
+      {'id': 'b-tarkwa', 'name': 'Tarkwa', 'location': 'Tarkwa Market'},
+      {'id': 'b-accra', 'name': 'Accra'},
+    ]);
+
 /// A staff backend: lists [branches] and answers add-staff with
 /// [addStatus] and [addBody]. [requests] collects what the app sent.
 class FakeStaffBackend {
@@ -176,34 +186,152 @@ class FakeStaffBackend {
   String addBody;
   final requests = <http.Request>[];
 
-  String branches = jsonEncode([
-    {'id': 'b-tarkwa', 'name': 'Tarkwa', 'location': 'Tarkwa Market'},
-    {'id': 'b-accra', 'name': 'Accra', 'location': null},
-  ]);
+  String branches = defaultBranchesJson();
 
-  late final StaffApi api = StaffApi(
-    baseUrl: testBaseUrl,
-    client: MockClient((request) async {
-      requests.add(request);
-      if (request.url.path.endsWith(StaffApi.branchesPath)) {
-        return http.Response(
-          branchesStatus == 200
-              ? branches
-              : errorBody(branchesStatus, 'Not found'),
-          branchesStatus,
-        );
-      }
-      if (request.url.path.endsWith('/api/staff/v1/add-staff')) {
-        return http.Response(addBody, addStatus);
-      }
-      return http.Response(errorBody(404, 'Not found'), 404);
-    }),
-  );
+  late final http.Client _client = MockClient((request) async {
+    requests.add(request);
+    if (request.url.path.endsWith(BranchApi.branchesPath)) {
+      return http.Response(
+        branchesStatus == 200 ? branches : errorBody(branchesStatus, 'Not found'),
+        branchesStatus,
+      );
+    }
+    if (request.url.path.endsWith('/api/staff/v1/add-staff')) {
+      return http.Response(addBody, addStatus);
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final StaffApi api = StaffApi(baseUrl: testBaseUrl, client: _client);
+  late final BranchApi branchApi =
+      BranchApi(baseUrl: testBaseUrl, client: _client);
 
   /// The JSON body of the last add-staff request.
   Map<String, dynamic> get lastAdd => jsonDecode(
-        requests
-            .lastWhere((r) => r.url.path.endsWith('/add-staff'))
-            .body,
+        requests.lastWhere((r) => r.url.path.endsWith('/add-staff')).body,
       ) as Map<String, dynamic>;
+}
+
+/// What a fake member backend saw of one upload.
+class SeenUpload {
+  SeenUpload(this.fields, this.fileField, this.fileName, this.fileBytes,
+      this.contentType);
+
+  final Map<String, String> fields;
+  final String? fileField;
+  final String? fileName;
+  final List<int> fileBytes;
+  final String? contentType;
+}
+
+/// A member backend. Each call to add-member or the ID upload takes the
+/// next answer from [addAnswers] or [uploadAnswers]; when those run out it
+/// answers 200. An answer of null means the connection drops.
+class FakeMemberBackend {
+  FakeMemberBackend({this.branchesStatus = 200});
+
+  int branchesStatus;
+  String branches = defaultBranchesJson();
+  final addAnswers = <(int, String)?>[];
+  final uploadAnswers = <(int, String)?>[];
+
+  final addBodies = <Map<String, dynamic>>[];
+  final uploads = <SeenUpload>[];
+  int branchCalls = 0;
+
+  static const newMemberId = '7b0c3c3e-1a4f-4c5e-9d0e-2f6a1b8c9d10';
+  static String addOk([String id = newMemberId]) =>
+      jsonEncode({'status': 'success', 'Id': id});
+  static const uploadOk =
+      '{"status":"success","message":"reviewing Kyc information"}';
+
+  late final http.Client _client = MockClient.streaming((request, body) async {
+    final path = request.url.path;
+    if (path.endsWith(BranchApi.branchesPath)) {
+      branchCalls++;
+      return _stream(
+        branchesStatus,
+        branchesStatus == 200 ? branches : errorBody(branchesStatus, 'Nope'),
+      );
+    }
+    if (path.endsWith(MemberApi.addMemberPath)) {
+      final text = await body.bytesToString();
+      addBodies.add(jsonDecode(text) as Map<String, dynamic>);
+      final answer = addAnswers.isEmpty ? (200, addOk()) : addAnswers.removeAt(0);
+      if (answer == null) throw http.ClientException('connection dropped');
+      return _stream(answer.$1, answer.$2);
+    }
+    if (path.endsWith(MemberApi.kycUploadPath)) {
+      uploads.add(await _readMultipart(request, body));
+      final answer =
+          uploadAnswers.isEmpty ? (200, uploadOk) : uploadAnswers.removeAt(0);
+      if (answer == null) throw http.ClientException('connection dropped');
+      return _stream(answer.$1, answer.$2);
+    }
+    return _stream(404, errorBody(404, 'Not found'));
+  });
+
+  late final MemberApi api = MemberApi(baseUrl: testBaseUrl, client: _client);
+  late final BranchApi branchApi =
+      BranchApi(baseUrl: testBaseUrl, client: _client);
+
+  static http.StreamedResponse _stream(int status, String body) =>
+      http.StreamedResponse(Stream.value(utf8.encode(body)), status);
+
+  /// A small multipart reader, enough for the fields and one file the app
+  /// sends.
+  static Future<SeenUpload> _readMultipart(
+    http.BaseRequest request,
+    http.ByteStream body,
+  ) async {
+    final bytes = await body.toBytes();
+    final type = request.headers['content-type'] ?? '';
+    final boundary = RegExp(r'boundary=(.+)$').firstMatch(type)!.group(1)!;
+    final text = latin1.decode(bytes);
+    final fields = <String, String>{};
+    String? fileField;
+    String? fileName;
+    String? contentType;
+    var fileBytes = <int>[];
+    for (final part in text.split('--$boundary')) {
+      final split = part.indexOf('\r\n\r\n');
+      if (split < 0) continue;
+      final headers = part.substring(0, split);
+      var content = part.substring(split + 4);
+      if (content.endsWith('\r\n')) {
+        content = content.substring(0, content.length - 2);
+      }
+      final name = RegExp(r'name="([^"]*)"').firstMatch(headers)?.group(1);
+      final file = RegExp(r'filename="([^"]*)"').firstMatch(headers)?.group(1);
+      if (name == null) continue;
+      if (file != null) {
+        fileField = name;
+        fileName = file;
+        contentType = RegExp(r'content-type: (\S+)', caseSensitive: false)
+            .firstMatch(headers)
+            ?.group(1);
+        fileBytes = latin1.encode(content);
+      } else {
+        fields[name] = content;
+      }
+    }
+    return SeenUpload(fields, fileField, fileName, fileBytes, contentType);
+  }
+}
+
+/// A tiny but valid-looking PNG header, enough for the type check.
+final pngBytes = Uint8List.fromList(
+    [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4]);
+
+/// The start of a JPEG file.
+final jpegBytes = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 5, 6, 7]);
+
+/// APIs on fake backends, for widget tests that only need the app to start.
+Apis fakeApis() {
+  final staff = FakeStaffBackend();
+  return Apis(
+    staff: staff.api,
+    members: FakeMemberBackend().api,
+    branches: staff.branchApi,
+  );
 }

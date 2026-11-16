@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../auth/auth_session.dart';
+import '../branches/branch_api.dart';
 import '../common/gradient_button.dart';
 import '../shell/section_page.dart';
 import 'add_staff_flow.dart';
@@ -13,10 +14,16 @@ import 'staff_api.dart';
 /// Hiding the button from agents is only presentation: the backend refuses
 /// add-staff from anyone but an administrator.
 class StaffPage extends StatefulWidget {
-  const StaffPage({super.key, required this.session, required this.api});
+  const StaffPage({
+    super.key,
+    required this.session,
+    required this.api,
+    required this.branchApi,
+  });
 
   final AuthSession session;
   final StaffApi api;
+  final BranchApi branchApi;
 
   @override
   State<StaffPage> createState() => _StaffPageState();
@@ -30,6 +37,7 @@ class _StaffPageState extends State<StaffPage> {
     if (_adding) {
       return AddStaffFlow(
         api: widget.api,
+        branchApi: widget.branchApi,
         onClose: () => setState(() => _adding = false),
       );
     }

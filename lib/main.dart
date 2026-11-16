@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'api/apis.dart';
 import 'api/authenticated_client.dart';
 import 'auth/auth_api.dart';
 import 'auth/auth_gate.dart';
@@ -13,7 +14,6 @@ import 'settings/theme_controller.dart';
 import 'settings/theme_mode_store.dart';
 import 'shell/sidebar_controller.dart';
 import 'shell/sidebar_state_store.dart';
-import 'staff/staff_api.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -38,7 +38,7 @@ Future<void> main() async {
 
   runApp(CashClientApp(
     sessions: sessions,
-    staffApi: StaffApi(baseUrl: AppConfig.apiBaseUrl, client: client),
+    apis: Apis.connect(baseUrl: AppConfig.apiBaseUrl, client: client),
     lock: InactivityLock(),
     theme: theme,
     sidebar: sidebar,
@@ -50,7 +50,7 @@ class CashClientApp extends StatelessWidget {
   const CashClientApp({
     super.key,
     required this.sessions,
-    required this.staffApi,
+    required this.apis,
     required this.lock,
     required this.theme,
     required this.sidebar,
@@ -58,7 +58,7 @@ class CashClientApp extends StatelessWidget {
   });
 
   final SessionManager sessions;
-  final StaffApi staffApi;
+  final Apis apis;
   final InactivityLock lock;
   final ThemeController theme;
   final SidebarController sidebar;
@@ -79,7 +79,7 @@ class CashClientApp extends StatelessWidget {
             LockLayer(sessions: sessions, lock: lock, child: child!),
         home: AuthGate(
           sessions: sessions,
-          staffApi: staffApi,
+          apis: apis,
           theme: theme,
           sidebar: sidebar,
           appInfo: appInfo,

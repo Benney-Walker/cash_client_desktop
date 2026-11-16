@@ -17,38 +17,6 @@ void main() {
     branch: const Branch(id: 'b-tarkwa', name: 'Tarkwa'),
   );
 
-  group('fetchBranches', () {
-    test('reads and sorts the branches by name', () async {
-      final backend = FakeStaffBackend();
-
-      final branches = await backend.api.fetchBranches();
-
-      expect(branches.map((b) => b.name), ['Accra', 'Tarkwa']);
-      expect(branches.last.location, 'Tarkwa Market');
-      expect(backend.requests.single.url.toString(),
-          '$testBaseUrl/api/branch/v1/all');
-    });
-
-    test('skips malformed entries', () async {
-      final backend = FakeStaffBackend()
-        ..branches = '[{"id": "b1", "name": "Tarkwa"}, {"name": "No id"}]';
-
-      final branches = await backend.api.fetchBranches();
-
-      expect(branches.map((b) => b.id), ['b1']);
-    });
-
-    test('a missing endpoint is notFound', () async {
-      final backend = FakeStaffBackend(branchesStatus: 404);
-
-      await expectLater(
-        backend.api.fetchBranches(),
-        throwsA(isA<ApiException>()
-            .having((e) => e.failure, 'failure', ApiFailure.notFound)),
-      );
-    });
-  });
-
   group('addStaff', () {
     test('posts the details as JSON', () async {
       final backend = FakeStaffBackend();

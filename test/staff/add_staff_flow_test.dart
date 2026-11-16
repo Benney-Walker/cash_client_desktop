@@ -22,7 +22,13 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: StaffPage(session: session, api: backend.api)),
+        home: Scaffold(
+          body: StaffPage(
+            session: session,
+            api: backend.api,
+            branchApi: backend.branchApi,
+          ),
+        ),
       ),
     );
   }

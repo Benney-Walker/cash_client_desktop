@@ -27,7 +27,7 @@ void main() {
         home: AppShell(
           session: adminSession,
           onSignOut: () {},
-          staffApi: FakeStaffBackend().api,
+          apis: fakeApis(),
           theme: ThemeController(MemoryThemeModeStore()),
           sidebar: sidebar,
           appInfo: testAppInfo,

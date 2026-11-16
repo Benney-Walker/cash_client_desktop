@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../api/api_exception.dart';
+import '../branches/branch_api.dart';
+import '../branches/branch_field.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
+import '../common/step_flow.dart';
 import '../theme/app_gradients.dart';
-import '../theme/app_status_colors.dart';
 import '../theme/app_theme.dart';
 import 'staff_api.dart';
 import 'staff_models.dart';
@@ -20,9 +21,15 @@ import 'staff_models.dart';
 /// texts the new staff member their staff ID (owner decisions 15 November
 /// 2026; CASH_CLIENT_DESKTOP.md section 16).
 class AddStaffFlow extends StatefulWidget {
-  const AddStaffFlow({super.key, required this.api, required this.onClose});
+  const AddStaffFlow({
+    super.key,
+    required this.api,
+    required this.branchApi,
+    required this.onClose,
+  });
 
   final StaffApi api;
+  final BranchApi branchApi;
 
   /// Back to the Staff page.
   final VoidCallback onClose;
@@ -94,7 +101,7 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
       _branchError = null;
     });
     try {
-      final branches = await widget.api.fetchBranches();
+      final branches = await widget.branchApi.fetchBranches();
       if (!mounted) return;
       setState(() {
         _branches = branches;
@@ -292,9 +299,10 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _StepIndicator(
+                          StepIndicator(
                             titles: _stepTitles,
                             current: _step,
+                            keyPrefix: 'addStaff',
                           ),
                           const SizedBox(height: 20),
                           _buildStep(context),
@@ -577,7 +585,7 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
             const SizedBox(height: 20),
             _branchField(context),
             const SizedBox(height: 16),
-            const _InfoNote(
+            const InfoNote(
               key: Key('addStaff.rules'),
               text: "A collector can't have any other role. Administrator "
                   'and Agent can be combined. Each branch can have only one '
@@ -590,80 +598,15 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
   }
 
   Widget _branchField(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final branches = _branches;
-    final error = _branchError;
-
-    if (_loadingBranches && branches == null) {
-      return const Row(
-        key: Key('addStaff.branchesLoading'),
-        children: [
-          SizedBox.square(
-            dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 10),
-          Text('Loading branches…'),
-        ],
-      );
-    }
-    if (branches == null) {
-      final notOffered =
-          error is ApiException && error.failure == ApiFailure.notFound;
-      return Column(
-        key: const Key('addStaff.branchesError'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // A field that can't be filled still has to block "Next".
-          FormField<Branch>(
-            validator: (_) => 'Branches are needed to add staff',
-            builder: (field) => Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.error_outline, size: 20, color: scheme.error),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    notOffered
-                        ? "Branches can't be loaded: the server doesn't "
-                            'offer the branch list yet.'
-                        : "Branches couldn't be loaded. Check your "
-                            'connection and try again.',
-                    style: textTheme.bodyMedium?.copyWith(color: scheme.error),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextButton.icon(
-            key: const Key('addStaff.retryBranches'),
-            onPressed: _loadingBranches ? null : _loadBranches,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Try again'),
-          ),
-        ],
-      );
-    }
-    return DropdownButtonFormField<Branch>(
-      key: const Key('addStaff.branch'),
-      initialValue: _branch,
-      decoration: const InputDecoration(labelText: 'Branch'),
-      disabledHint: const Text('No branches have been set up yet'),
-      items: [
-        for (final branch in branches)
-          DropdownMenuItem(
-            value: branch,
-            child: Text(
-              branch.location == null
-                  ? branch.name
-                  : '${branch.name} · ${branch.location}',
-            ),
-          ),
-      ],
+    return BranchField(
+      keyPrefix: 'addStaff',
+      branches: _branches,
+      loading: _loadingBranches,
+      error: _branchError,
+      onRetry: _loadBranches,
+      value: _branch,
       onChanged: (branch) => setState(() => _branch = branch),
-      validator: (value) => value == null ? 'Choose a branch' : null,
+      neededTo: 'add staff',
     );
   }
 
@@ -671,7 +614,6 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
     final staff = _buildStaff();
     final error = _submitError;
     final errorStep = _submitErrorStep;
-    final scheme = Theme.of(context).colorScheme;
 
     return GlassCard(
       key: const Key('addStaff.review'),
@@ -680,7 +622,8 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ReviewSection(
+          ReviewSection(
+            keyPrefix: 'addStaff',
             title: 'Personal',
             onEdit: () => _goTo(AddStaffStep.personal),
             rows: [
@@ -688,7 +631,8 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
               ('Date of birth', isoDate(staff.dateOfBirth)),
             ],
           ),
-          _ReviewSection(
+          ReviewSection(
+            keyPrefix: 'addStaff',
             title: 'Contact',
             onEdit: () => _goTo(AddStaffStep.contact),
             rows: [
@@ -697,7 +641,8 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
               ('Address', staff.residentialAddress),
             ],
           ),
-          _ReviewSection(
+          ReviewSection(
+            keyPrefix: 'addStaff',
             title: 'Role and branch',
             onEdit: () => _goTo(AddStaffStep.roleAndBranch),
             rows: [
@@ -709,7 +654,7 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
             ],
           ),
           const SizedBox(height: 8),
-          _InfoNote(
+          InfoNote(
             key: const Key('addStaff.passwordNote'),
             text: 'When you add them, the system creates a default password '
                 'and texts the staff ID to ${staff.phoneNumber}. They then '
@@ -717,131 +662,17 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
           ),
           if (error != null) ...[
             const SizedBox(height: 12),
-            Semantics(
-              liveRegion: true,
-              child: Container(
-                key: const Key('addStaff.error'),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: scheme.errorContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.error_outline,
-                        size: 20, color: scheme.onErrorContainer),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            error,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: scheme.onErrorContainer),
-                          ),
-                          if (errorStep != null &&
-                              errorStep != AddStaffStep.review)
-                            TextButton(
-                              key: const Key('addStaff.fixStep'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: scheme.onErrorContainer,
-                                padding: EdgeInsets.zero,
-                              ),
-                              onPressed: () => _goTo(errorStep),
-                              child: Text(
-                                'Go to ${_stepTitles[errorStep.index]}',
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            ErrorBanner(
+              key: const Key('addStaff.error'),
+              message: error,
+              actionKey: const Key('addStaff.fixStep'),
+              actionLabel: errorStep != null && errorStep != AddStaffStep.review
+                  ? 'Go to ${_stepTitles[errorStep.index]}'
+                  : null,
+              onAction: errorStep == null ? null : () => _goTo(errorStep),
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// The row of numbered steps above the card: done steps get a check, the
-/// current one the gradient.
-class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({required this.titles, required this.current});
-
-  final List<String> titles;
-  final int current;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final gradients = AppGradients.of(context);
-
-    return Semantics(
-      label: 'Step ${current + 1} of ${titles.length}: ${titles[current]}',
-      child: ExcludeSemantics(
-        child: Row(
-          children: [
-            for (var i = 0; i < titles.length; i++) ...[
-              if (i > 0)
-                Expanded(
-                  child: Divider(
-                    indent: 8,
-                    endIndent: 8,
-                    color: i <= current ? scheme.primary : scheme.outline,
-                  ),
-                ),
-              Row(
-                key: Key('addStaff.step$i'),
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: i == current ? gradients.button : null,
-                      color: i < current ? scheme.primaryContainer : null,
-                      border: i > current
-                          ? Border.all(color: scheme.outline, width: 1.5)
-                          : null,
-                    ),
-                    child: i < current
-                        ? Icon(Icons.check,
-                            size: 16, color: scheme.onPrimaryContainer)
-                        : Text(
-                            '${i + 1}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: i == current
-                                  ? gradients.onButton
-                                  : scheme.onSurfaceVariant,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    titles[i],
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight:
-                          i == current ? FontWeight.w600 : FontWeight.w400,
-                      color: i == current
-                          ? scheme.onSurface
-                          : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -930,98 +761,6 @@ class _RoleTile extends StatelessWidget {
   }
 }
 
-class _ReviewSection extends StatelessWidget {
-  const _ReviewSection({
-    required this.title,
-    required this.rows,
-    required this.onEdit,
-  });
-
-  final String title;
-  final List<(String, String)> rows;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text(title, style: textTheme.labelLarge)),
-              TextButton(
-                key: Key('addStaff.edit.$title'),
-                onPressed: onEdit,
-                child: const Text('Edit'),
-              ),
-            ],
-          ),
-          for (final (label, value) in rows)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 130,
-                    child: Text(
-                      label,
-                      style: textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ),
-                  Expanded(child: Text(value, style: textTheme.bodyMedium)),
-                ],
-              ),
-            ),
-          const Divider(height: 12),
-        ],
-      ),
-    );
-  }
-}
-
-/// A neutral information box with an icon.
-class _InfoNote extends StatelessWidget {
-  const _InfoNote({super.key, required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final status = AppStatusColors.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: status.neutralContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, size: 20, color: status.neutral),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: status.neutral),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Shown after the backend accepted the new staff member.
 class _AddedCard extends StatelessWidget {
   const _AddedCard({
@@ -1037,7 +776,6 @@ class _AddedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final status = AppStatusColors.of(context);
     final roles = staff.orderedRoles.map((role) => role.label).join(' and ');
 
     return GlassCard(
@@ -1047,25 +785,7 @@ class _AddedCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status: an icon and a label, not colour alone.
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: status.successContainer,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle, size: 18, color: status.success),
-                const SizedBox(width: 6),
-                Text(
-                  'Added',
-                  style: textTheme.labelLarge?.copyWith(color: status.success),
-                ),
-              ],
-            ),
-          ),
+          const StatusPill(label: 'Added', tone: StatusTone.success),
           const SizedBox(height: 12),
           Text(
             '${staff.fullName} has been added as $roles at '

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../api/apis.dart';
 import '../auth/auth_session.dart';
 import '../common/brand_mark.dart';
 import '../common/gradient_backdrop.dart';
+import '../members/members_page.dart';
 import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
 import '../settings/theme_controller.dart';
-import '../staff/staff_api.dart';
 import '../staff/staff_page.dart';
 import '../theme/app_gradients.dart';
 import 'app_section.dart';
@@ -20,7 +21,7 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.session,
     required this.onSignOut,
-    required this.staffApi,
+    required this.apis,
     required this.theme,
     required this.sidebar,
     required this.appInfo,
@@ -28,7 +29,7 @@ class AppShell extends StatefulWidget {
 
   final AuthSession session;
   final VoidCallback onSignOut;
-  final StaffApi staffApi;
+  final Apis apis;
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
@@ -96,9 +97,14 @@ class _AppShellState extends State<AppShell> {
       expanded ? Icon(icon) : Tooltip(message: label, child: Icon(icon));
 
   Widget _page(AppSection section) => switch (section) {
+        AppSection.members => MembersPage(
+            api: widget.apis.members,
+            branchApi: widget.apis.branches,
+          ),
         AppSection.staff => StaffPage(
             session: widget.session,
-            api: widget.staffApi,
+            api: widget.apis.staff,
+            branchApi: widget.apis.branches,
           ),
         AppSection.settings => SettingsScreen(
             session: widget.session,

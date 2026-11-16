@@ -24,6 +24,12 @@ dependencies:
   package_info_plus: ^10.2.0
   # Calls to the backend; same version as the collector app.
   http: ^1.6.0
+  # Sets the content type of the ID image in the multipart upload. Already
+  # a dependency of http; listed because the app imports it directly.
+  http_parser: ^4.1.2
+  # The system "Open" dialog for choosing a member's ID image. Flutter team
+  # plugin; supports Windows and macOS.
+  file_selector: ^1.0.3
 
 dev_dependencies:
   flutter_test:

@@ -37,7 +37,7 @@ void main() {
     await tester.pumpWidget(
       CashClientApp(
         sessions: sessions,
-        staffApi: FakeStaffBackend().api,
+        apis: fakeApis(),
         lock: InactivityLock(),
         theme: theme,
         sidebar: sidebar,

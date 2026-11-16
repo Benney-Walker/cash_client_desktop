@@ -43,6 +43,7 @@ address.
 | Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
+| Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried. Member list not built |
 | Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -50,8 +51,8 @@ address.
 Dashboard, Members, Withdrawals, Collectors, Daily submissions, Loans, Staff,
 Settings. The grouping and order are a first proposal. Withdrawals means
 member withdrawals recorded at the office; collector withdrawal requests
-were removed from the system on 2026-11-15. Only Settings and Staff
-(Add staff) have screens so far, and every section is shown to both roles until
+were removed from the system on 2026-11-15. Only Settings, Members
+(Register member) and Staff (Add staff) have screens so far, and every section is shown to both roles until
 each section's role rules are confirmed.
 
 ## Design decisions
@@ -108,10 +109,12 @@ each section's role rules are confirmed.
 ```
 lib/
   main.dart            app start-up
+  members/             Members page, Register member steps, member API and models
   staff/               Staff page, Add staff steps, staff API and models
-  api/                 backend errors, the authenticated HTTP client
+  branches/            branch list API, branch model and picker
+  api/                 backend errors, the authenticated HTTP client, Apis bundle
   auth/                sign-in API, session, gate, sign-in screen
-  common/              shared widgets (gradient button, brand mark)
+  common/              shared widgets (gradient button, step flow pieces), dates, UUIDs
   config/              build-time settings (--dart-define)
   shell/               sidebar, its remembered state, sections, page layout
   settings/            settings screen, light/dark choice, app info
@@ -144,6 +147,11 @@ test/                  mirrors lib/
   explains that the app is for administrators and agents.
 - **2026-11-15** Add staff (F3, four steps). API failure types for 404 and
   409, shared with the collector app.
+- **2026-11-16** Register member (M1, five steps, ID step can be skipped).
+  Step indicator, review section, notes and the branch picker moved to
+  shared widgets; branch list moved to its own API (`{id, name}`); APIs
+  passed down as one `Apis` bundle. macOS entitlements for outgoing network
+  calls and the file dialog. Added `file_selector` and `http_parser`.
 
 ## Known limitations
 
@@ -151,7 +159,7 @@ test/                  mirrors lib/
   was written in couldn't download the Flutter SDK or packages. Run
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
   `pubspec.lock` will update to add `shared_preferences`,
-  `package_info_plus` and `http`.
+  `package_info_plus`, `http`, `http_parser` and `file_selector`.
 - Signing out only forgets the tokens in the app; the backend has no logout
   endpoint, so they stay valid until they expire.
 - Add staff can't be used end to end until the backend (a) stops
@@ -159,6 +167,15 @@ test/                  mirrors lib/
   offers a branch list. The app calls `GET /api/branch/v1/all`, a proposed
   path (CASH_CLIENT_DESKTOP.md section 16); without it the branch step says
   the list isn't offered yet.
+- Register member works end to end once the branch list exists. Until
+  the backend reads `idempotencyKey` on add-member, a retry after a lost
+  answer gets 409 for the phone number (the app says the member was
+  probably registered). A member registered without an ID can't have one
+  added yet: that needs the member details page.
+- When the backend's rotating refresh tokens and logout (backend branch
+  `claude/backend-progress`, df9f555) reach `master`, the refresh response
+  changes to `{authToken, refreshToken}` and the app's refresh must be
+  updated (CASH_CLIENT_DESKTOP.md section 17).
 - The Account card can't show the branch: the login response doesn't
   include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.
