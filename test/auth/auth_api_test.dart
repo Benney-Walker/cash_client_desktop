@@ -137,36 +137,48 @@ void main() {
     });
   });
 
-  group('AuthApi.refreshAccessToken', () {
+  group('AuthApi.refresh', () {
     // A token in the backend's shape: three base64url parts.
     const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJTVEYwMDEifQ.c2lnbmF0dXJl';
 
-    test('posts the refresh token and returns the bare token body', () async {
+    test('reads the new access and refresh tokens (rotation)', () async {
       final requests = <http.Request>[];
-      final api = fakeAuthApi(200, jwt, requests: requests);
+      final api = fakeAuthApi(
+        200,
+        jsonEncode({'authToken': jwt, 'refreshToken': 'next-refresh'}),
+        requests: requests,
+      );
 
-      final token = await api.refreshAccessToken('refresh-token');
+      final tokens = await api.refresh('refresh-token');
 
-      expect(token, jwt);
+      expect(tokens.accessToken, jwt);
+      expect(tokens.refreshToken, 'next-refresh');
       expect(requests.single.url.toString(),
           '$testBaseUrl/api/auth/v1/refresh-staff-token');
       expect(jsonDecode(requests.single.body),
           {'refreshToken': 'refresh-token'});
     });
 
-    test('also accepts the token as a quoted JSON string', () async {
+    test('still accepts an older backend's bare access token', () async {
+      final tokens = await fakeAuthApi(200, jwt).refresh('r');
+
+      expect(tokens.accessToken, jwt);
+      expect(tokens.refreshToken, isNull);
+    });
+
+    test('also accepts the bare token as a quoted JSON string', () async {
       final api = fakeAuthApi(200, jsonEncode(jwt));
-      expect(await api.refreshAccessToken('r'), jwt);
+      expect((await api.refresh('r')).accessToken, jwt);
     });
 
     test('ignores surrounding whitespace', () async {
       final api = fakeAuthApi(200, '  $jwt\n');
-      expect(await api.refreshAccessToken('r'), jwt);
+      expect((await api.refresh('r')).accessToken, jwt);
     });
 
     test('401 (expired refresh token or inactive staff) is unauthorized', () {
       final api = fakeAuthApi(401, errorBody(401, 'Invalid refresh token'));
-      expect(api.refreshAccessToken('old'),
+      expect(api.refresh('old'),
           failsWith(ApiFailure.unauthorized));
     });
 
@@ -175,14 +187,35 @@ void main() {
         '',
         '<html>proxy page</html>',
         jsonEncode({'authToken': jwt}),
+        jsonEncode({'authToken': jwt, 'refreshToken': ''}),
+        jsonEncode({'authToken': 'not a jwt', 'refreshToken': 'r'}),
         'not a token',
         jsonEncode(42),
       ]) {
         final api = fakeAuthApi(200, body);
-        expect(api.refreshAccessToken('x'),
+        expect(api.refresh('x'),
             failsWith(ApiFailure.unexpectedResponse),
             reason: body);
       }
+    });
+  });
+
+  group('AuthApi.logout', () {
+    test('posts the refresh token and accepts the 204', () async {
+      final requests = <http.Request>[];
+      final api = fakeAuthApi(204, '', requests: requests);
+
+      await api.logout('refresh-token');
+
+      expect(requests.single.url.toString(),
+          '$testBaseUrl/api/auth/v1/logout');
+      expect(jsonDecode(requests.single.body),
+          {'refreshToken': 'refresh-token'});
+    });
+
+    test('a failure is reported to the caller', () {
+      final api = fakeAuthApi(500, errorBody(500, 'Down'));
+      expect(api.logout('r'), failsWith(ApiFailure.server));
     });
   });
 }

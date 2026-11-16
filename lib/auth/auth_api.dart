@@ -44,27 +44,69 @@ class AuthApi {
     return session;
   }
 
-  /// `POST /api/auth/v1/refresh-staff-token`. Returns a new access token.
+  /// `POST /api/auth/v1/refresh-staff-token`.
   ///
-  /// The backend answers with the bare token as the response body, not a
-  /// JSON object (contract as of 12 Nov 2026). Because the app asks for
-  /// JSON, Spring may also send it as a JSON string in quotes, so both are
-  /// accepted.
+  /// The backend rotates refresh tokens (owner decision 15 November 2026):
+  /// it answers `{authToken, refreshToken}`, and the refresh token sent here
+  /// stops working, so the caller must keep the new one. A retry within the
+  /// backend's grace period (30 seconds by default) after a lost answer gets
+  /// a fresh pair rather than ending the session.
+  ///
+  /// Older backends answered with the bare access token and kept the
+  /// refresh token. That is still accepted, with [RefreshedTokens.refreshToken]
+  /// null, so the app works against both until the change reaches `master`.
   ///
   /// The backend answers 401 ([ApiFailure.unauthorized]) when the refresh
-  /// token has expired or is invalid, or the staff member is no longer
-  /// active. It doesn't issue a new refresh token, so once that one expires
-  /// the staff member has to sign in again.
-  Future<String> refreshAccessToken(String refreshToken) async {
+  /// token has expired, was replaced or signed out, or the staff member is
+  /// no longer active.
+  Future<RefreshedTokens> refresh(String refreshToken) async {
     final response = await _post(
       '/api/auth/v1/refresh-staff-token',
       {'refreshToken': refreshToken},
     );
-    final accessToken = _bareToken(response.body);
-    if (accessToken == null) {
+    final tokens = _tokenPair(response.body) ?? _bareTokenOnly(response.body);
+    if (tokens == null) {
       throw const ApiException(ApiFailure.unexpectedResponse, statusCode: 200);
     }
-    return accessToken;
+    return tokens;
+  }
+
+  /// `POST /api/auth/v1/logout`: ends the session that [refreshToken]
+  /// belongs to, on the backend. The backend always answers 204, whether or
+  /// not it knew the token.
+  ///
+  /// Throws [ApiException] when the call itself fails; callers signing out
+  /// ignore that, since the app forgets the tokens either way.
+  Future<void> logout(String refreshToken) async {
+    await _post(
+      '/api/auth/v1/logout',
+      {'refreshToken': refreshToken},
+      okStatuses: const {200, 204},
+      timeout: logoutTimeout,
+    );
+  }
+
+  /// Signing out mustn't keep anyone waiting on a slow connection.
+  static const logoutTimeout = Duration(seconds: 5);
+
+  /// `{authToken, refreshToken}` in the body, or null if it isn't that.
+  static RefreshedTokens? _tokenPair(String body) {
+    final json = _jsonObject(body);
+    if (json == null) return null;
+    final access = json['authToken'];
+    final refresh = json['refreshToken'];
+    if (access is! String ||
+        !_jwtShape.hasMatch(access) ||
+        refresh is! String ||
+        refresh.trim().isEmpty) {
+      return null;
+    }
+    return RefreshedTokens(accessToken: access, refreshToken: refresh);
+  }
+
+  static RefreshedTokens? _bareTokenOnly(String body) {
+    final access = _bareToken(body);
+    return access == null ? null : RefreshedTokens(accessToken: access);
   }
 
   // The backend's tokens are signed JWTs: three base64url parts joined by
@@ -98,12 +140,15 @@ class AuthApi {
     }
   }
 
-  /// Sends a JSON body and returns a 200 response. Any other status becomes
+  /// Sends a JSON body and returns the response when its status is one of
+  /// [okStatuses] (200 by default). Any other status becomes
   /// an [ApiException] built from the backend's standard error body.
   Future<http.Response> _post(
     String path,
-    Map<String, Object?> body,
-  ) async {
+    Map<String, Object?> body, {
+    Set<int> okStatuses = const {200},
+    Duration? timeout,
+  }) async {
     final uri = _endpoint(path);
     final http.Response response;
     try {
@@ -116,7 +161,7 @@ class AuthApi {
             },
             body: jsonEncode(body),
           )
-          .timeout(timeout);
+          .timeout(timeout ?? this.timeout);
     } on TimeoutException {
       throw const ApiException(ApiFailure.network);
     } on http.ClientException {
@@ -124,7 +169,7 @@ class AuthApi {
       throw const ApiException(ApiFailure.network);
     }
 
-    if (response.statusCode != 200) {
+    if (!okStatuses.contains(response.statusCode)) {
       throw ApiException.fromResponse(response.statusCode, response.body);
     }
     return response;
@@ -145,4 +190,15 @@ class AuthApi {
         : base.path;
     return base.replace(path: '$prefix$path');
   }
+}
+
+/// What a refresh returns: a new access token and, from backends that
+/// rotate refresh tokens, the refresh token to use next time.
+class RefreshedTokens {
+  const RefreshedTokens({required this.accessToken, this.refreshToken});
+
+  final String accessToken;
+
+  /// Null from older backends, which keep the same refresh token.
+  final String? refreshToken;
 }

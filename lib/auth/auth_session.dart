@@ -75,12 +75,17 @@ class AuthSession {
     );
   }
 
-  /// The same session with a new access token, after a refresh.
-  AuthSession withAccessToken(String accessToken) => AuthSession(
+  /// The same session with the tokens from a refresh. [refreshToken] is
+  /// the replacement the backend issued, or null to keep the current one.
+  AuthSession withTokens({
+    required String accessToken,
+    String? refreshToken,
+  }) =>
+      AuthSession(
         staffId: staffId,
         staffName: staffName,
         roles: roles,
         accessToken: accessToken,
-        refreshToken: refreshToken,
+        refreshToken: refreshToken ?? this.refreshToken,
       );
 }

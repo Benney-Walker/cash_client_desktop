@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../api/api_exception.dart';
@@ -40,17 +42,34 @@ class SessionManager extends ChangeNotifier {
     required String password,
   }) async {
     final session = await _api.login(staffId: staffId, password: password);
-    if (session.role == null) throw const NotOfficeStaffException();
+    if (session.role == null) {
+      // Their tokens are never used, so end that session on the backend too.
+      _logOutQuietly(session);
+      throw const NotOfficeStaffException();
+    }
+    final previous = _session;
     _session = session;
     _endedByServer = false;
     notifyListeners();
+    // Unlocking signs in again, which starts a new backend session. End the
+    // old one only now that the new one exists: the backend's logout also
+    // refuses access tokens issued before it, and a token refused that way
+    // is recovered with one refresh, whereas a failed unlock that had
+    // already ended the old session would sign the staff member out.
+    if (previous != null) _logOutQuietly(previous);
   }
 
   /// The staff member chose to sign out.
   ///
-  /// The backend has no logout endpoint, so this forgets the tokens; they
-  /// stay valid on the server until they expire.
-  void signOut() => _clear(endedByServer: false);
+  /// The app forgets the tokens at once and asks the backend to end the
+  /// session (`POST /api/auth/v1/logout`) in the background. If that call
+  /// fails, for example offline, the tokens are still gone from the app and
+  /// the backend's session simply runs until it expires.
+  void signOut() {
+    final session = _session;
+    _clear(endedByServer: false);
+    if (session != null) _logOutQuietly(session);
+  }
 
   /// The backend refused the session: the refresh token expired, or the
   /// staff member was deactivated.
@@ -72,13 +91,20 @@ class SessionManager extends ChangeNotifier {
     final current = _session;
     if (current == null) throw const ApiException(ApiFailure.unauthorized);
     try {
-      final accessToken = await _api.refreshAccessToken(current.refreshToken);
-      // Only keep it if nobody signed out (or in again) while the refresh
-      // was in flight.
+      final tokens = await _api.refresh(current.refreshToken);
+      // Only keep them if nobody signed out (or in again) while the refresh
+      // was in flight. The backend has already retired the refresh token
+      // just sent, so the new one must replace it (rotation).
       if (identical(_session, current)) {
-        _session = current.withAccessToken(accessToken);
+        _session = current.withTokens(
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        );
+      } else if (tokens.refreshToken != null) {
+        // Signed out meanwhile: end the session this refresh continued.
+        _logOutWithToken(tokens.refreshToken!);
       }
-      return accessToken;
+      return tokens.accessToken;
     } on ApiException catch (e) {
       if (e.failure == ApiFailure.unauthorized &&
           identical(_session, current)) {
@@ -86,6 +112,15 @@ class SessionManager extends ChangeNotifier {
       }
       rethrow;
     }
+  }
+
+  void _logOutQuietly(AuthSession session) =>
+      _logOutWithToken(session.refreshToken);
+
+  void _logOutWithToken(String refreshToken) {
+    unawaited(
+      _api.logout(refreshToken).then<void>((_) {}, onError: (Object _) {}),
+    );
   }
 
   void _clear({required bool endedByServer}) {

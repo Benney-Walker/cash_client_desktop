@@ -40,10 +40,10 @@ address.
 | Sidebar shell | ✅ Collapsible left sidebar on the light gradient panel (D3), glass highlight on the selected item, state remembered between launches (can be turned off); every section is a placeholder |
 | Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Account (name, role, staff ID, Sign out), Appearance (light/dark, remember sidebar state) and About (version, server). No Password card while reset is kept out of the app |
 | Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. No "Forgot password?" (password reset kept out of the app for now) |
-| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings |
+| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`, keeping the rotated refresh token) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings ends the session on the backend (`POST /api/auth/v1/logout`) |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
-| Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried. Member list not built |
+| Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried. Member list not built |
 | Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -152,6 +152,11 @@ test/                  mirrors lib/
   shared widgets; branch list moved to its own API (`{id, name}`); APIs
   passed down as one `Apis` bundle. macOS entitlements for outgoing network
   calls and the file dialog. Added `file_selector` and `http_parser`.
+- **2026-11-16** Sessions follow the backend's rotating refresh tokens
+  (the new refresh token is kept after every refresh; the old bare-token
+  answer still works) and sign-out calls `POST /api/auth/v1/logout`.
+  ID pictures can be dragged onto Register member. Added `desktop_drop`
+  (0.8).
 
 ## Known limitations
 
@@ -159,23 +164,14 @@ test/                  mirrors lib/
   was written in couldn't download the Flutter SDK or packages. Run
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
   `pubspec.lock` will update to add `shared_preferences`,
-  `package_info_plus`, `http`, `http_parser` and `file_selector`.
-- Signing out only forgets the tokens in the app; the backend has no logout
-  endpoint, so they stay valid until they expire.
-- Add staff can't be used end to end until the backend (a) stops
-  requiring a password on add-staff and generates a default one, and (b)
-  offers a branch list. The app calls `GET /api/branch/v1/all`, a proposed
-  path (CASH_CLIENT_DESKTOP.md section 16); without it the branch step says
-  the list isn't offered yet.
-- Register member works end to end once the branch list exists. Until
+  `package_info_plus`, `http`, `http_parser`, `file_selector` and
+  `desktop_drop`.
+- Register member and Add staff need the backend's `claude/backend-progress`
+  branch (branch list, add-staff without a password). Until
   the backend reads `idempotencyKey` on add-member, a retry after a lost
   answer gets 409 for the phone number (the app says the member was
   probably registered). A member registered without an ID can't have one
   added yet: that needs the member details page.
-- When the backend's rotating refresh tokens and logout (backend branch
-  `claude/backend-progress`, df9f555) reach `master`, the refresh response
-  changes to `{authToken, refreshToken}` and the app's refresh must be
-  updated (CASH_CLIENT_DESKTOP.md section 17).
 - The Account card can't show the branch: the login response doesn't
   include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.

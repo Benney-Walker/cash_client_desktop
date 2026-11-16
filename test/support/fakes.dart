@@ -80,12 +80,15 @@ const testAppInfo = AppInfo(
 const testBaseUrl = 'https://api.example.test';
 
 /// A login response body in the backend's shape.
-String loginBody({List<String> roles = const ['ADMINISTRATOR']}) =>
+String loginBody({
+  List<String> roles = const ['ADMINISTRATOR'],
+  String refreshToken = 'refresh-token',
+}) =>
     jsonEncode({
       'staffName': 'KOFI MENSAH',
       'roles': roles,
       'authToken': 'access-token',
-      'refreshToken': 'refresh-token',
+      'refreshToken': refreshToken,
     });
 
 /// The backend's standard error body.
@@ -136,22 +139,53 @@ class FakeRefreshApi {
   /// When true, the refresh call fails as if there were no connection.
   bool offline = false;
 
+  /// The refresh tokens sent to the logout endpoint, in order.
+  final loggedOut = <String>[];
+
+  /// The refresh tokens sent to the refresh endpoint, in order.
+  final refreshedWith = <String>[];
+
+  int _logins = 0;
+
   late final AuthApi api = AuthApi(
     baseUrl: testBaseUrl,
     client: MockClient((request) async {
+      if (request.url.path.endsWith('/logout')) {
+        loggedOut.add((jsonDecode(request.body) as Map)['refreshToken'] as String);
+        return http.Response('', 204);
+      }
       if (request.url.path.endsWith('/refresh-staff-token')) {
         calls++;
+        refreshedWith
+            .add((jsonDecode(request.body) as Map)['refreshToken'] as String);
         if (delay > Duration.zero) await Future<void>.delayed(delay);
         if (offline) throw http.ClientException('no connection');
         final (status, body) = refresh;
         return http.Response(body, status);
       }
-      return http.Response(loginBody(roles: loginRoles), 200);
+      // Each sign-in gets its own refresh token: refresh-token, then
+      // refresh-token-2, and so on.
+      _logins++;
+      return http.Response(
+        loginBody(
+          roles: loginRoles,
+          refreshToken: _logins == 1 ? 'refresh-token' : 'refresh-token-$_logins',
+        ),
+        200,
+      );
     }),
   );
 
-  /// The backend sends the new access token as the bare response body.
+  /// An older backend: the new access token as the bare response body, and
+  /// the refresh token kept.
   static (int, String) issues(String token) => (200, token);
+
+  /// The current backend: a new access token and a replacement refresh
+  /// token (rotation).
+  static (int, String) rotates(String accessToken, String refreshToken) => (
+        200,
+        jsonEncode({'authToken': accessToken, 'refreshToken': refreshToken}),
+      );
 
   static (int, String) refuses() =>
       (401, errorBody(401, 'Invalid refresh token'));

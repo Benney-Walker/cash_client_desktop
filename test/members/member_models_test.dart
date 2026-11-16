@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:cash_client_desktop/common/uuid.dart';
+import 'package:cash_client_desktop/members/kyc_image_picker.dart';
 import 'package:cash_client_desktop/members/member_models.dart';
+import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fakes.dart';
@@ -124,6 +126,40 @@ void main() {
 
       expect(image.sizeLabel, '1.5 MB');
       expect(KycImage.check('s.png', pngBytes).$1!.sizeLabel, '1 KB');
+    });
+  });
+
+  group('checkDroppedImage', () {
+    XFile file(Uint8List bytes, String name) =>
+        XFile.fromData(bytes, name: name, length: bytes.length);
+
+    test('uses a single dropped JPEG or PNG', () async {
+      final (image, problem) =
+          await checkDroppedImage([file(jpegBytes, 'card.jpg')]);
+
+      expect(problem, isNull);
+      expect(image!.fileName, 'card.jpg');
+      expect(image.type, KycImageType.jpeg);
+    });
+
+    test('asks for one picture at a time', () async {
+      final (image, problem) = await checkDroppedImage(
+          [file(pngBytes, 'a.png'), file(pngBytes, 'b.png')]);
+
+      expect(image, isNull);
+      expect(problem, 'Drop one picture at a time.');
+    });
+
+    test('refuses a file that is not an image', () async {
+      final (image, problem) = await checkDroppedImage(
+          [file(Uint8List.fromList([0x25, 0x50, 0x44, 0x46]), 'scan.pdf')]);
+
+      expect(image, isNull);
+      expect(problem, contains("isn't a JPEG or PNG"));
+    });
+
+    test('ignores an empty drop', () async {
+      expect(await checkDroppedImage(const []), (null, null));
     });
   });
 

@@ -26,6 +26,10 @@ void main() {
   AuthApi backend() => AuthApi(
         baseUrl: testBaseUrl,
         client: MockClient((request) async {
+          // Unlocking ends the old session in the background.
+          if (request.url.path.endsWith('/logout')) {
+            return http.Response('', 204);
+          }
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           loginStaffIds.add(body['staffId'] as String);
           if (body['password'] != 'right') {

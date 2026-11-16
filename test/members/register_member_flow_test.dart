@@ -35,6 +35,7 @@ void main() {
             branchApi: backend.branchApi,
             onClose: () => closed++,
             pickImage: pickImage ?? pickPng,
+            acceptDrops: false,
           ),
         ),
       ),

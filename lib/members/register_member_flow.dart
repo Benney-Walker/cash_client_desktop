@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +12,7 @@ import '../common/step_flow.dart';
 import '../common/uuid.dart';
 import '../theme/app_gradients.dart';
 import '../theme/app_theme.dart';
+import 'kyc_drop_target.dart';
 import 'kyc_image_picker.dart';
 import 'member_api.dart';
 import 'member_models.dart';
@@ -30,6 +32,7 @@ class RegisterMemberFlow extends StatefulWidget {
     required this.branchApi,
     required this.onClose,
     this.pickImage = pickKycImageFile,
+    this.acceptDrops = true,
   });
 
   final MemberApi api;
@@ -40,6 +43,10 @@ class RegisterMemberFlow extends StatefulWidget {
 
   /// Replaced in tests; the real one opens the system file dialog.
   final PickKycImage pickImage;
+
+  /// Whether an ID picture can be dragged onto the picture area. Off in
+  /// widget tests, where the drag-and-drop plugin isn't available.
+  final bool acceptDrops;
 
   @override
   State<RegisterMemberFlow> createState() => _RegisterMemberFlowState();
@@ -378,6 +385,15 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
     final result = await widget.pickImage();
     if (result == null || !mounted) return;
     final (image, problem) = result;
+    setState(() {
+      if (image != null) _image = image;
+      _imageProblem = problem;
+    });
+  }
+
+  Future<void> _imageDropped(List<XFile> files) async {
+    final (image, problem) = await checkDroppedImage(files);
+    if (!mounted || (image == null && problem == null)) return;
     setState(() {
       if (image != null) _image = image;
       _imageProblem = problem;
@@ -804,14 +820,14 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
           builder: (field) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (image == null)
-                _ChooseImageBox(onTap: _chooseImage)
+              if (widget.acceptDrops)
+                KycDropTarget(
+                  onDropped: _imageDropped,
+                  builder: (context, hovering) =>
+                      _pictureArea(image, hovering: hovering),
+                )
               else
-                _ChosenImage(
-                  image: image,
-                  onReplace: _chooseImage,
-                  onRemove: () => setState(() => _image = null),
-                ),
+                _pictureArea(image, hovering: false),
               // The "choose a picture" error only matters while none is
               // chosen; it would otherwise linger until the next check.
               for (final problem in [
@@ -833,6 +849,19 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
         ),
       ],
     );
+  }
+
+  /// The empty drop-or-choose box, or the chosen picture. Dropping a file
+  /// on either uses it.
+  Widget _pictureArea(KycImage? image, {required bool hovering}) {
+    return image == null
+        ? _ChooseImageBox(onTap: _chooseImage, hovering: hovering)
+        : _ChosenImage(
+            image: image,
+            hovering: hovering,
+            onReplace: _chooseImage,
+            onRemove: () => setState(() => _image = null),
+          );
   }
 
   Widget _idStep(BuildContext context) {
@@ -1076,9 +1105,12 @@ class _ChoiceTile extends StatelessWidget {
 
 /// The empty picture area: a large target that opens the file dialog.
 class _ChooseImageBox extends StatelessWidget {
-  const _ChooseImageBox({required this.onTap});
+  const _ChooseImageBox({required this.onTap, required this.hovering});
 
   final VoidCallback onTap;
+
+  /// A file is being dragged over the box.
+  final bool hovering;
 
   @override
   Widget build(BuildContext context) {
@@ -1086,10 +1118,10 @@ class _ChooseImageBox extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Material(
-      color: scheme.primaryContainer.withValues(alpha: 0.35),
+      color: scheme.primaryContainer.withValues(alpha: hovering ? 0.8 : 0.35),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: scheme.primary, width: 1.5),
+        side: BorderSide(color: scheme.primary, width: hovering ? 3 : 1.5),
       ),
       child: InkWell(
         key: const Key('registerMember.chooseImage'),
@@ -1099,10 +1131,16 @@ class _ChooseImageBox extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
           child: Column(
             children: [
-              Icon(Icons.upload_file_outlined, size: 32, color: scheme.primary),
+              Icon(
+                hovering ? Icons.file_download_outlined : Icons.upload_file_outlined,
+                size: 32,
+                color: scheme.primary,
+              ),
               const SizedBox(height: 8),
               Text(
-                'Choose a picture of the ID',
+                hovering
+                    ? 'Drop to use this picture'
+                    : 'Drag a picture of the ID here, or choose a file',
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: scheme.onSurface,
                   fontWeight: FontWeight.w600,
@@ -1127,11 +1165,15 @@ class _ChooseImageBox extends StatelessWidget {
 class _ChosenImage extends StatelessWidget {
   const _ChosenImage({
     required this.image,
+    required this.hovering,
     required this.onReplace,
     required this.onRemove,
   });
 
   final KycImage image;
+
+  /// A file is being dragged over the picture, to replace it.
+  final bool hovering;
   final VoidCallback onReplace;
   final VoidCallback onRemove;
 
@@ -1146,7 +1188,9 @@ class _ChosenImage extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
+        border: hovering
+            ? Border.all(color: scheme.primary, width: 3)
+            : Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -1179,7 +1223,9 @@ class _ChosenImage extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${image.type.label} · ${image.sizeLabel}',
+                  hovering
+                      ? 'Drop to replace this picture'
+                      : '${image.type.label} · ${image.sizeLabel}',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: scheme.onSurfaceVariant),
                 ),

@@ -6,6 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fakes.dart';
 
+/// Lets the background logout call finish.
+Future<void> settle() async {
+  for (var i = 0; i < 5; i++) {
+    await Future<void>.delayed(Duration.zero);
+  }
+}
+
 void main() {
   group('signIn', () {
     test('an administrator is signed in', () async {
@@ -118,7 +125,21 @@ void main() {
       await sessions.signIn(staffId: 'STF001', password: 'x');
     }
 
-    test('keeps the new access token and the same refresh token', () async {
+    test('keeps both new tokens and uses the new refresh token next time',
+        () async {
+      await start(FakeRefreshApi.rotates('new.access.token', 'refresh-2'));
+
+      expect(await sessions.refreshAccessToken(), 'new.access.token');
+      expect(sessions.session?.refreshToken, 'refresh-2');
+
+      backend.refresh = FakeRefreshApi.rotates('third.access.token', 'refresh-3');
+      await sessions.refreshAccessToken();
+
+      expect(backend.refreshedWith, ['refresh-token', 'refresh-2']);
+      expect(sessions.session?.refreshToken, 'refresh-3');
+    });
+
+    test('an older backend keeps the same refresh token', () async {
       await start(FakeRefreshApi.issues('new.access.token'));
 
       final token = await sessions.refreshAccessToken();
@@ -174,6 +195,22 @@ void main() {
       expect(sessions.session, isNotNull);
     });
 
+    test('a sign-out during a rotating refresh ends the new session too',
+        () async {
+      await start(
+        FakeRefreshApi.rotates('new.access.token', 'refresh-2'),
+        delay: const Duration(milliseconds: 20),
+      );
+
+      final refreshing = sessions.refreshAccessToken();
+      sessions.signOut();
+      await refreshing;
+      await settle();
+
+      expect(sessions.session, isNull);
+      expect(backend.loggedOut, containsAll(['refresh-token', 'refresh-2']));
+    });
+
     test('a sign-out during the refresh is not undone', () async {
       await start(
         FakeRefreshApi.issues('new.access.token'),
@@ -183,6 +220,72 @@ void main() {
       final refreshing = sessions.refreshAccessToken();
       sessions.signOut();
       await refreshing;
+
+      expect(sessions.session, isNull);
+    });
+  });
+
+  group('backend logout', () {
+    test('signing out ends the session on the backend', () async {
+      final backend = FakeRefreshApi(FakeRefreshApi.refuses());
+      final sessions = SessionManager(api: backend.api);
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      sessions.signOut();
+      await settle();
+
+      expect(sessions.session, isNull);
+      expect(backend.loggedOut, ['refresh-token']);
+    });
+
+    test('signing in again (unlock) ends the previous session afterwards',
+        () async {
+      final backend = FakeRefreshApi(FakeRefreshApi.refuses());
+      final sessions = SessionManager(api: backend.api);
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+      await settle();
+
+      expect(sessions.session?.refreshToken, 'refresh-token-2');
+      expect(backend.loggedOut, ['refresh-token']);
+    });
+
+    test("a refused collector's tokens are ended on the backend", () async {
+      final backend = FakeRefreshApi(
+        FakeRefreshApi.refuses(),
+        loginRoles: const ['COLLECTOR'],
+      );
+      final sessions = SessionManager(api: backend.api);
+
+      await expectLater(
+        sessions.signIn(staffId: 'COL001', password: 'x'),
+        throwsA(isA<NotOfficeStaffException>()),
+      );
+      await settle();
+
+      expect(backend.loggedOut, ['refresh-token']);
+    });
+
+    test('the backend ending the session sends no logout', () async {
+      final backend = FakeRefreshApi(FakeRefreshApi.refuses());
+      final sessions = SessionManager(api: backend.api);
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      sessions.endSession();
+      await settle();
+
+      expect(backend.loggedOut, isEmpty);
+    });
+
+    test('a failed logout still signs out', () async {
+      final sessions = SessionManager(api: fakeAuthApi(200, loginBody()));
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      // fakeAuthApi answers the logout with the login body and 200; any
+      // answer, or none, leaves the staff member signed out.
+      sessions.signOut();
+      await settle();
 
       expect(sessions.session, isNull);
     });

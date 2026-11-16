@@ -30,6 +30,9 @@ dependencies:
   # The system "Open" dialog for choosing a member's ID image. Flutter team
   # plugin; supports Windows and macOS.
   file_selector: ^1.0.3
+  # Dragging an ID picture onto Register member. Kept on 0.8: 0.9 changes
+  # the API and needs Flutter 3.47.7 or later.
+  desktop_drop: ^0.8.4
 
 dev_dependencies:
   flutter_test:

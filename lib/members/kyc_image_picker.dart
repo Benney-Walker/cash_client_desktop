@@ -22,3 +22,16 @@ Future<(KycImage?, String?)?> pickKycImageFile() async {
   }
   return KycImage.check(file.name, await file.readAsBytes());
 }
+
+/// Checks files dropped onto the ID picture area. One picture only.
+Future<(KycImage?, String?)> checkDroppedImage(List<XFile> files) async {
+  if (files.isEmpty) return (null, null);
+  if (files.length > 1) {
+    return (null, 'Drop one picture at a time.');
+  }
+  final file = files.single;
+  if (await file.length() > KycImage.maxBytes) {
+    return (null, 'That file is larger than 5 MB. Choose a smaller one.');
+  }
+  return KycImage.check(file.name, await file.readAsBytes());
+}
