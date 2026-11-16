@@ -253,20 +253,28 @@ class ErrorBanner extends StatelessWidget {
 }
 
 /// The tone of a [StatusPill].
-enum StatusTone { success, warning }
+enum StatusTone { success, warning, danger, neutral }
 
 /// A status shown as an icon and a label, so it doesn't rely on colour
 /// alone.
 class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.label, required this.tone});
+  const StatusPill({
+    super.key,
+    required this.label,
+    required this.tone,
+    this.icon,
+  });
 
   final String label;
   final StatusTone tone;
 
+  /// Replaces the tone's usual icon.
+  final IconData? icon;
+
   @override
   Widget build(BuildContext context) {
     final status = AppStatusColors.of(context);
-    final (background, foreground, icon) = switch (tone) {
+    final (background, foreground, toneIcon) = switch (tone) {
       StatusTone.success => (
           status.successContainer,
           status.success,
@@ -276,6 +284,16 @@ class StatusPill extends StatelessWidget {
           status.warningContainer,
           status.warning,
           Icons.schedule,
+        ),
+      StatusTone.danger => (
+          status.dangerContainer,
+          status.danger,
+          Icons.cancel_outlined,
+        ),
+      StatusTone.neutral => (
+          status.neutralContainer,
+          status.neutral,
+          Icons.remove_circle_outline,
         ),
     };
 
@@ -288,7 +306,7 @@ class StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: foreground),
+          Icon(icon ?? toneIcon, size: 18, color: foreground),
           const SizedBox(width: 6),
           Text(
             label,

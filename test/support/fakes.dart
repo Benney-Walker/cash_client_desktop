@@ -273,6 +273,68 @@ class FakeMemberBackend {
   final uploads = <SeenUpload>[];
   int branchCalls = 0;
 
+  /// Member details by id; an unknown id gets 404.
+  final profiles = <String, Map<String, dynamic>>{};
+  int detailCalls = 0;
+
+  /// What search answers: these results (whatever the query) or, when
+  /// [searchStatus] isn't 200, an error. [searches] records (query, page).
+  int searchStatus = 200;
+  List<Map<String, dynamic>> searchResults = [];
+  int? searchTotal;
+  final searches = <(String, int)>[];
+
+  /// A member's details in the backend's shape (section 18).
+  static Map<String, dynamic> profileJson({
+    String id = newMemberId,
+    String kycStatus = 'NOT_SUBMITTED',
+    bool canUpload = true,
+    bool limited = false,
+    bool withKyc = true,
+  }) =>
+      {
+        'memberId': id,
+        'firstName': 'Ama',
+        'middleName': null,
+        'lastName': 'Mensah',
+        'phoneNumber': '0241234567',
+        if (!limited) ...{
+          'dateOfBirth': '1990-07-04',
+          'residentialAddress': 'Hse 3, Tarkwa',
+          'occupation': 'Trader',
+          'registeredByStaffId': 'STF0012',
+          'createdAt': '2026-11-16T10:15:30.123',
+        },
+        'membershipStatus': 'PENDING',
+        'branchId': 'b-tarkwa',
+        'branchName': 'Tarkwa',
+        'detailLevel': limited ? 'LIMITED' : 'FULL',
+        if (withKyc && !limited)
+          'kyc': {
+            'status': kycStatus,
+            'documentType': kycStatus == 'NOT_SUBMITTED' ? null : 'ECOWAS_CARD',
+            'rejectionReason':
+                kycStatus == 'REJECTED' ? 'The picture is blurred' : null,
+            'canUpload': canUpload,
+          },
+        'accounts': [
+          {'accountNumber': '1001234', 'accountType': 'SHARES', 'status': 'INACTIVE'},
+          {'accountNumber': '2004567', 'accountType': 'SAVINGS', 'status': 'INACTIVE'},
+        ],
+      };
+
+  static Map<String, dynamic> summaryJson(String id, String first,
+          {String status = 'ACTIVE', String phone = '0201112223'}) =>
+      {
+        'memberId': id,
+        'firstName': first,
+        'middleName': null,
+        'lastName': 'Mensah',
+        'phoneNumber': phone,
+        'branchName': 'Tarkwa',
+        'membershipStatus': status,
+      };
+
   static const newMemberId = '7b0c3c3e-1a4f-4c5e-9d0e-2f6a1b8c9d10';
   static String addOk([String id = newMemberId]) =>
       jsonEncode({'status': 'success', 'Id': id});
@@ -294,6 +356,31 @@ class FakeMemberBackend {
       final answer = addAnswers.isEmpty ? (200, addOk()) : addAnswers.removeAt(0);
       if (answer == null) throw http.ClientException('connection dropped');
       return _stream(answer.$1, answer.$2);
+    }
+    if (path.endsWith(MemberApi.searchPath)) {
+      final query = request.url.queryParameters['query'] ?? '';
+      final page = int.parse(request.url.queryParameters['page'] ?? '0');
+      searches.add((query, page));
+      if (searchStatus != 200) {
+        return _stream(searchStatus, errorBody(searchStatus, 'Not found'));
+      }
+      return _stream(
+        200,
+        jsonEncode({
+          'items': searchResults,
+          'page': page,
+          'size': MemberApi.pageSize,
+          'total': searchTotal ?? searchResults.length,
+        }),
+      );
+    }
+    if (path.contains('${MemberApi.memberDetailsPath}/')) {
+      detailCalls++;
+      final id = path.split('/').last;
+      final profile = profiles[id];
+      return profile == null
+          ? _stream(404, errorBody(404, 'The requested resource was not found'))
+          : _stream(200, jsonEncode(profile));
     }
     if (path.endsWith(MemberApi.kycUploadPath)) {
       uploads.add(await _readMultipart(request, body));

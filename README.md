@@ -43,7 +43,8 @@ address.
 | Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`, keeping the rotated refresh token) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings ends the session on the backend (`POST /api/auth/v1/logout`) |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
-| Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried. Member list not built |
+| Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
+| Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. Waits on the backend's search and details additions (CASH_CLIENT_DESKTOP.md §18) |
 | Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -157,6 +158,10 @@ test/                  mirrors lib/
   answer still works) and sign-out calls `POST /api/auth/v1/logout`.
   ID pictures can be dragged onto Register member. Added `desktop_drop`
   (0.8).
+- **2026-11-16** Members page as P2: search and results beside the member's
+  details; Upload ID document from the details; View member after
+  registering. ID document fields shared between the two screens; danger
+  and neutral status pills.
 
 ## Known limitations
 
@@ -170,8 +175,11 @@ test/                  mirrors lib/
   branch (branch list, add-staff without a password). Until
   the backend reads `idempotencyKey` on add-member, a retry after a lost
   answer gets 409 for the phone number (the app says the member was
-  probably registered). A member registered without an ID can't have one
-  added yet: that needs the member details page.
+  probably registered).
+- Member search and the details' branch, ID status and limited view are
+  proposed in CASH_CLIENT_DESKTOP.md §18 and not on the backend yet. Until
+  then search says it isn't offered, and the details page shows what the
+  backend sends without Upload ID document.
 - The Account card can't show the branch: the login response doesn't
   include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.

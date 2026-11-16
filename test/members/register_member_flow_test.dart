@@ -105,10 +105,15 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.light,
       home: Scaffold(
-        body: MembersPage(api: members.api, branchApi: members.branchApi),
+        body: MembersPage(
+          api: members.api,
+          branchApi: members.branchApi,
+          pickImage: pickPng,
+          acceptDrops: false,
+        ),
       ),
     ));
-    expect(find.byKey(const Key('members.listPlaceholder')), findsOneWidget);
+    expect(find.byKey(const Key('members.nothingSelected')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('members.register')));
     await tester.pumpAndSettle();

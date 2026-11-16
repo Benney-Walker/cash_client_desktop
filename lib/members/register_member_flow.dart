@@ -1,4 +1,3 @@
-import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -12,7 +11,7 @@ import '../common/step_flow.dart';
 import '../common/uuid.dart';
 import '../theme/app_gradients.dart';
 import '../theme/app_theme.dart';
-import 'kyc_drop_target.dart';
+import 'kyc_document_fields.dart';
 import 'kyc_image_picker.dart';
 import 'member_api.dart';
 import 'member_models.dart';
@@ -31,6 +30,7 @@ class RegisterMemberFlow extends StatefulWidget {
     required this.api,
     required this.branchApi,
     required this.onClose,
+    this.onViewMember,
     this.pickImage = pickKycImageFile,
     this.acceptDrops = true,
   });
@@ -40,6 +40,10 @@ class RegisterMemberFlow extends StatefulWidget {
 
   /// Back to the Members page.
   final VoidCallback onClose;
+
+  /// Opens the member just registered on the Members page, where an ID
+  /// document can be uploaded later.
+  final ValueChanged<String>? onViewMember;
 
   /// Replaced in tests; the real one opens the system file dialog.
   final PickKycImage pickImage;
@@ -73,7 +77,7 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
   final _phone = TextEditingController();
   final _occupation = TextEditingController();
   final _address = TextEditingController();
-  final _idNumber = TextEditingController();
+  final _document = KycDocumentDraft();
 
   List<TextEditingController> get _controllers => [
         _firstName,
@@ -83,15 +87,11 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
         _phone,
         _occupation,
         _address,
-        _idNumber,
       ];
 
   int _step = 0;
   MemberAccountType? _accountType;
   Branch? _branch;
-  KycDocumentType? _documentType;
-  KycImage? _image;
-  String? _imageProblem;
   bool _skipId = false;
 
   List<Branch>? _branches;
@@ -133,6 +133,7 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
     for (final controller in _controllers) {
       controller.dispose();
     }
+    _document.dispose();
     super.dispose();
   }
 
@@ -163,8 +164,7 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
       (_controllers.any((c) => c.text.trim().isNotEmpty) ||
           _accountType != null ||
           _branch != null ||
-          _documentType != null ||
-          _image != null);
+          !_document.isEmpty);
 
   NewMember _buildMember() => NewMember(
         firstName: _firstName.text.trim(),
@@ -178,11 +178,7 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
         branch: _branch!,
       );
 
-  KycDocument _buildDocument() => KycDocument(
-        type: _documentType!,
-        idNumber: KycDocumentType.normalize(_idNumber.text),
-        image: _image!,
-      );
+  KycDocument _buildDocument() => _document.build();
 
   /// Details are about to change: a new registration needs a new key,
   /// unless an earlier attempt may have registered the member.
@@ -340,13 +336,11 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
     for (final controller in _controllers) {
       controller.clear();
     }
+    _document.clear();
     setState(() {
       _step = 0;
       _accountType = null;
       _branch = null;
-      _documentType = null;
-      _image = null;
-      _imageProblem = null;
       _skipId = false;
       _submitError = null;
       _submitErrorStep = null;
@@ -381,25 +375,6 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
     }
   }
 
-  Future<void> _chooseImage() async {
-    final result = await widget.pickImage();
-    if (result == null || !mounted) return;
-    final (image, problem) = result;
-    setState(() {
-      if (image != null) _image = image;
-      _imageProblem = problem;
-    });
-  }
-
-  Future<void> _imageDropped(List<XFile> files) async {
-    final (image, problem) = await checkDroppedImage(files);
-    if (!mounted || (image == null && problem == null)) return;
-    setState(() {
-      if (image != null) _image = image;
-      _imageProblem = problem;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -408,10 +383,13 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
 
     final Widget body;
     if (registered != null && _finished) {
+      final memberId = _memberId!;
+      final view = widget.onViewMember;
       body = _RegisteredCard(
         member: registered,
         kycSent: _kycSent,
         onRegisterAnother: _registerAnother,
+        onView: view == null ? null : () => view(memberId),
         onDone: widget.onClose,
       );
     } else if (registered != null && _uploadFailed) {
@@ -765,105 +743,6 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
     );
   }
 
-  /// The ID document fields. Used as step 4, and on its own when the
-  /// member is registered but the upload failed.
-  Widget _idFields(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final type = _documentType;
-    final image = _image;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<KycDocumentType>(
-                key: const Key('$_k.documentType'),
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Document'),
-                items: [
-                  for (final option in KycDocumentType.values)
-                    DropdownMenuItem(value: option, child: Text(option.label)),
-                ],
-                onChanged: (value) => setState(() => _documentType = value),
-                validator: (value) =>
-                    value == null ? 'Choose the document' : null,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                key: const Key('$_k.idNumber'),
-                controller: _idNumber,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(50),
-                  _UpperCaseFormatter(),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'ID number',
-                  hintText: type?.example,
-                ),
-                validator: (value) => type == null
-                    ? null
-                    : type.problemWith(value ?? ''),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        FormField<KycImage>(
-          validator: (_) =>
-              _image == null ? 'Choose a picture of the ID document' : null,
-          builder: (field) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.acceptDrops)
-                KycDropTarget(
-                  onDropped: _imageDropped,
-                  builder: (context, hovering) =>
-                      _pictureArea(image, hovering: hovering),
-                )
-              else
-                _pictureArea(image, hovering: false),
-              // The "choose a picture" error only matters while none is
-              // chosen; it would otherwise linger until the next check.
-              for (final problem in [
-                _imageProblem,
-                if (image == null) field.errorText,
-              ])
-                if (problem != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    problem,
-                    key: problem == _imageProblem
-                        ? const Key('$_k.imageProblem')
-                        : null,
-                    style: textTheme.bodySmall?.copyWith(color: scheme.error),
-                  ),
-                ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// The empty drop-or-choose box, or the chosen picture. Dropping a file
-  /// on either uses it.
-  Widget _pictureArea(KycImage? image, {required bool hovering}) {
-    return image == null
-        ? _ChooseImageBox(onTap: _chooseImage, hovering: hovering)
-        : _ChosenImage(
-            image: image,
-            hovering: hovering,
-            onReplace: _chooseImage,
-            onRemove: () => setState(() => _image = null),
-          );
-  }
-
   Widget _idStep(BuildContext context) {
     return Form(
       key: _formKeys[3],
@@ -874,7 +753,12 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _idFields(context),
+            KycDocumentFields(
+              draft: _document,
+              keyPrefix: _k,
+              pickImage: widget.pickImage,
+              acceptDrops: widget.acceptDrops,
+            ),
             const SizedBox(height: 16),
             const InfoNote(
               key: Key('$_k.idNote'),
@@ -995,7 +879,12 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
               ErrorBanner(key: const Key('$_k.kycError'), message: error),
             ],
             const SizedBox(height: 16),
-            _idFields(context),
+            KycDocumentFields(
+              draft: _document,
+              keyPrefix: _k,
+              pickImage: widget.pickImage,
+              acceptDrops: widget.acceptDrops,
+            ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -1022,16 +911,6 @@ class _RegisterMemberFlowState extends State<RegisterMemberFlow> {
       ),
     );
   }
-}
-
-/// Capitals as the user types, the way the backend stores ID numbers.
-class _UpperCaseFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) =>
-      newValue.copyWith(text: newValue.text.toUpperCase());
 }
 
 /// One of a set of mutually exclusive options. Shows a radio mark as well
@@ -1103,168 +982,20 @@ class _ChoiceTile extends StatelessWidget {
   }
 }
 
-/// The empty picture area: a large target that opens the file dialog.
-class _ChooseImageBox extends StatelessWidget {
-  const _ChooseImageBox({required this.onTap, required this.hovering});
-
-  final VoidCallback onTap;
-
-  /// A file is being dragged over the box.
-  final bool hovering;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Material(
-      color: scheme.primaryContainer.withValues(alpha: hovering ? 0.8 : 0.35),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: scheme.primary, width: hovering ? 3 : 1.5),
-      ),
-      child: InkWell(
-        key: const Key('registerMember.chooseImage'),
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-          child: Column(
-            children: [
-              Icon(
-                hovering ? Icons.file_download_outlined : Icons.upload_file_outlined,
-                size: 32,
-                color: scheme.primary,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                hovering
-                    ? 'Drop to use this picture'
-                    : 'Drag a picture of the ID here, or choose a file',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: scheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'JPEG or PNG, 5 MB at most',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The chosen picture, with its name and size, so staff can check it's
-/// the right card and readable before sending it.
-class _ChosenImage extends StatelessWidget {
-  const _ChosenImage({
-    required this.image,
-    required this.hovering,
-    required this.onReplace,
-    required this.onRemove,
-  });
-
-  final KycImage image;
-
-  /// A file is being dragged over the picture, to replace it.
-  final bool hovering;
-  final VoidCallback onReplace;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Container(
-      key: const Key('registerMember.chosenImage'),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: hovering
-            ? Border.all(color: scheme.primary, width: 3)
-            : Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.memory(
-              image.bytes,
-              width: 180,
-              height: 112,
-              fit: BoxFit.cover,
-              semanticLabel: 'Picture of the ID document',
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 180,
-                height: 112,
-                color: scheme.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: Icon(Icons.broken_image_outlined,
-                    color: scheme.onSurfaceVariant),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  image.fileName,
-                  style: theme.textTheme.titleSmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  hovering
-                      ? 'Drop to replace this picture'
-                      : '${image.type.label} · ${image.sizeLabel}',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    TextButton(
-                      key: const Key('registerMember.replaceImage'),
-                      onPressed: onReplace,
-                      child: const Text('Replace'),
-                    ),
-                    TextButton(
-                      key: const Key('registerMember.removeImage'),
-                      onPressed: onRemove,
-                      child: const Text('Remove'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Shown once the member is registered and the ID step is settled.
 class _RegisteredCard extends StatelessWidget {
   const _RegisteredCard({
     required this.member,
     required this.kycSent,
     required this.onRegisterAnother,
+    required this.onView,
     required this.onDone,
   });
 
   final NewMember member;
   final bool kycSent;
   final VoidCallback onRegisterAnother;
+  final VoidCallback? onView;
   final VoidCallback onDone;
 
   @override
@@ -1303,7 +1034,8 @@ class _RegisteredCard extends StatelessWidget {
                 ? 'Their ID document has been sent for verification. Their '
                     'accounts become active once it is verified.'
                 : 'No ID document was added. Their accounts stay inactive '
-                    'until one is uploaded and verified.',
+                    'until one is uploaded and verified; open the member to '
+                    'upload it later.',
             style: textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
@@ -1315,6 +1047,14 @@ class _RegisteredCard extends StatelessWidget {
                 onPressed: onRegisterAnother,
                 child: const Text('Register another'),
               ),
+              if (onView != null) ...[
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  key: const Key('registerMember.view'),
+                  onPressed: onView,
+                  child: const Text('View member'),
+                ),
+              ],
               const SizedBox(width: 12),
               GradientButton(
                 key: const Key('registerMember.done'),

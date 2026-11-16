@@ -8,6 +8,9 @@ import '../api/api_call.dart';
 import '../api/api_exception.dart';
 import '../api/endpoint.dart';
 import 'member_models.dart';
+import 'member_profile.dart';
+
+export 'member_profile.dart';
 
 /// Calls the backend's member endpoints (`MemberController`, open to
 /// administrators and agents). [client] should be the app's
@@ -22,6 +25,14 @@ class MemberApi {
         _client = client;
 
   static const addMemberPath = '/api/member/v1/add-member';
+  static const memberDetailsPath = '/api/member/v1/member-details';
+
+  /// Proposed in CASH_CLIENT_DESKTOP.md section 18; not on the backend yet.
+  static const searchPath = '/api/member/v1/search';
+
+  /// Search needs at least this many characters (section 18).
+  static const minQueryLength = 2;
+  static const pageSize = 20;
   static const kycUploadPath = '/api/member/v1/kyc-document-upload';
 
   final String _baseUrl;
@@ -58,6 +69,41 @@ class MemberApi {
     final id = json is Map<String, dynamic> ? (json['Id'] ?? json['id']) : null;
     if (id is! String || id.isEmpty) throw unexpectedOk();
     return id;
+  }
+
+  /// `GET /api/member/v1/search` (proposed): members whose name contains
+  /// [query], whose phone number starts with it, or with an account number
+  /// equal to it, across all branches.
+  ///
+  /// Throws [ApiException]; `notFound` (404) while the backend doesn't
+  /// offer search yet.
+  Future<MemberSearchPage> searchMembers(String query, {int page = 0}) async {
+    final uri = apiUri(_baseUrl, searchPath, {
+      'query': query.trim(),
+      'page': '$page',
+      'size': '$pageSize',
+    });
+    final response = await sendChecked(
+      () => _client.get(uri, headers: const {'Accept': 'application/json'}),
+      timeout: timeout,
+    );
+    return MemberSearchPage.fromJson(decodeJson(response.body)) ??
+        (throw unexpectedOk());
+  }
+
+  /// `GET /api/member/v1/member-details/{memberId}`.
+  ///
+  /// Throws [ApiException]; `notFound` (404) for an unknown member.
+  Future<MemberProfile> fetchMember(String memberId) async {
+    final response = await sendChecked(
+      () => _client.get(
+        apiUri(_baseUrl, '$memberDetailsPath/${Uri.encodeComponent(memberId)}'),
+        headers: const {'Accept': 'application/json'},
+      ),
+      timeout: timeout,
+    );
+    return MemberProfile.fromJson(decodeJson(response.body)) ??
+        (throw unexpectedOk());
   }
 
   /// `POST /api/member/v1/kyc-document-upload` (multipart). Sends the ID
