@@ -159,7 +159,7 @@ void main() {
           {'refreshToken': 'refresh-token'});
     });
 
-    test('still accepts an older backend's bare access token', () async {
+    test('still accepts an older backends bare access token', () async {
       final tokens = await fakeAuthApi(200, jwt).refresh('r');
 
       expect(tokens.accessToken, jwt);
