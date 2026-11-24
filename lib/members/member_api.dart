@@ -27,10 +27,11 @@ class MemberApi {
   static const addMemberPath = '/api/member/v1/add-member';
   static const memberDetailsPath = '/api/member/v1/member-details';
 
-  /// Proposed in CASH_CLIENT_DESKTOP.md section 18; not on the backend yet.
-  static const searchPath = '/api/member/v1/search';
+  /// Built on the backend 23 November 2026 (`66115b2`).
+  static const searchPath = '/api/member/v1/search-members';
 
-  /// Search needs at least this many characters (section 18).
+  /// The backend only needs a non-blank query; the desktop waits for two
+  /// characters so a single letter doesn't list half the members.
   static const minQueryLength = 2;
   static const pageSize = 20;
   static const kycUploadPath = '/api/member/v1/kyc-document-upload';
@@ -71,12 +72,11 @@ class MemberApi {
     return id;
   }
 
-  /// `GET /api/member/v1/search` (proposed): members whose name contains
-  /// [query], whose phone number starts with it, or with an account number
-  /// equal to it, across all branches.
+  /// `GET /api/member/v1/search-members`: members of every branch matching
+  /// part of a name, part of a phone number, or an exact account number,
+  /// sorted by last then first name. Administrators and Agents.
   ///
-  /// Throws [ApiException]; `notFound` (404) while the backend doesn't
-  /// offer search yet.
+  /// Throws [ApiException]; `validation` (400) for a blank query.
   Future<MemberSearchPage> searchMembers(String query, {int page = 0}) async {
     final uri = apiUri(_baseUrl, searchPath, {
       'query': query.trim(),
@@ -87,7 +87,10 @@ class MemberApi {
       () => _client.get(uri, headers: const {'Accept': 'application/json'}),
       timeout: timeout,
     );
-    return MemberSearchPage.fromJson(decodeJson(response.body)) ??
+    return PagedResult.fromJson(
+          decodeJson(response.body),
+          MemberSummary.fromJson,
+        ) ??
         (throw unexpectedOk());
   }
 

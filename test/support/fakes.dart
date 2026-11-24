@@ -200,6 +200,26 @@ const adminSession = AuthSession(
   refreshToken: 'refresh-token',
 );
 
+/// A page as the backend sends it (Spring's `PagedModel`), with
+/// [MemberApi.pageSize] items a page.
+String pagedJson(
+  List<Map<String, dynamic>> content, {
+  int page = 0,
+  int? total,
+  int size = MemberApi.pageSize,
+}) {
+  final all = total ?? content.length;
+  return jsonEncode({
+    'content': content,
+    'page': {
+      'size': size,
+      'number': page,
+      'totalElements': all,
+      'totalPages': all == 0 ? 0 : (all + size - 1) ~/ size,
+    },
+  });
+}
+
 /// The branch list a fake backend sends.
 String defaultBranchesJson() => jsonEncode([
       {'id': 'b-tarkwa', 'name': 'Tarkwa', 'location': 'Tarkwa Market'},
@@ -324,15 +344,19 @@ class FakeMemberBackend {
       };
 
   static Map<String, dynamic> summaryJson(String id, String first,
-          {String status = 'ACTIVE', String phone = '0201112223'}) =>
+          {String status = 'ACTIVE', String? phone = '0201112223'}) =>
       {
         'memberId': id,
         'firstName': first,
         'middleName': null,
         'lastName': 'Mensah',
         'phoneNumber': phone,
+        'branchId': 'b-tarkwa',
         'branchName': 'Tarkwa',
         'membershipStatus': status,
+        'accounts': [
+          {'accountNumber': '1009$id', 'accountType': 'SHARES', 'status': 'ACTIVE'},
+        ],
       };
 
   static const newMemberId = '7b0c3c3e-1a4f-4c5e-9d0e-2f6a1b8c9d10';
@@ -364,15 +388,8 @@ class FakeMemberBackend {
       if (searchStatus != 200) {
         return _stream(searchStatus, errorBody(searchStatus, 'Not found'));
       }
-      return _stream(
-        200,
-        jsonEncode({
-          'items': searchResults,
-          'page': page,
-          'size': MemberApi.pageSize,
-          'total': searchTotal ?? searchResults.length,
-        }),
-      );
+      final total = searchTotal ?? searchResults.length;
+      return _stream(200, pagedJson(searchResults, page: page, total: total));
     }
     if (path.contains('${MemberApi.memberDetailsPath}/')) {
       detailCalls++;

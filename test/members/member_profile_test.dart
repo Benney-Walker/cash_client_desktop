@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cash_client_desktop/members/member_models.dart';
 import 'package:cash_client_desktop/members/member_profile.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,25 +68,48 @@ void main() {
     });
   });
 
-  group('MemberSearchPage.fromJson', () {
-    test('reads the results and skips broken ones', () {
-      final page = MemberSearchPage.fromJson({
-        'items': [
-          FakeMemberBackend.summaryJson('m1', 'Ama'),
+  group('member search page', () {
+    test('reads the backend\'s PagedModel and skips broken rows', () {
+      final page = PagedResult.fromJson(
+        jsonDecode(pagedJson([
+          FakeMemberBackend.summaryJson('m1', 'Ama', phone: null),
           {'firstName': 'No id'},
-        ],
-        'page': 0,
-        'size': 20,
-        'total': 7,
-      })!;
+        ], total: 45)),
+        MemberSummary.fromJson,
+      )!;
 
-      expect(page.items.single.fullName, 'Ama Mensah');
-      expect(page.items.single.status, MembershipStatus.active);
-      expect(page.total, 7);
+      final ama = page.items.single;
+      expect(ama.fullName, 'Ama Mensah');
+      expect(ama.status, MembershipStatus.active);
+      expect(ama.phoneNumber, isNull, reason: 'hidden for another branch');
+      expect(ama.branchId, 'b-tarkwa');
+      expect(ama.accounts.single.typeLabel, 'Shares');
+      expect(page.totalElements, 45);
+      expect(page.totalPages, 3);
+      expect(page.hasMore, isTrue);
     });
 
-    test('a body without items, page or total is refused', () {
-      expect(MemberSearchPage.fromJson({'items': []}), isNull);
+    test('the last page has no more', () {
+      final page = PagedResult.fromJson(
+        jsonDecode(pagedJson(const [], page: 2, total: 45)),
+        MemberSummary.fromJson,
+      )!;
+
+      expect(page.hasMore, isFalse);
+    });
+
+    test('a body that is not a page is refused', () {
+      expect(
+        PagedResult.fromJson({'items': [], 'total': 0}, MemberSummary.fromJson),
+        isNull,
+      );
+      expect(
+        PagedResult.fromJson(
+          {'content': [], 'page': {'number': 0}},
+          MemberSummary.fromJson,
+        ),
+        isNull,
+      );
     });
   });
 }

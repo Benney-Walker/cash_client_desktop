@@ -1,9 +1,13 @@
 import 'package:flutter/foundation.dart';
 
+import '../api/paged.dart';
+
+export '../api/paged.dart';
+
 import 'member_models.dart';
 
-// What the Members page reads: search results and member details. The
-// shapes follow CASH_CLIENT_DESKTOP.md section 18. Fields the backend
+// What the Members page reads: search results and member details, as the
+// backend sends them (CASH_CLIENT_DESKTOP.md section 20). Fields the backend
 // doesn't send (yet, or for an Agent looking at another branch's member)
 // are null, and the page leaves them out.
 
@@ -73,22 +77,27 @@ String _fullName(Object? first, Object? middle, Object? last) => [
       _text(last),
     ].whereType<String>().join(' ');
 
-/// One search result.
+/// One search or list result (`MemberSummaryResponse`). For another
+/// branch's member an Agent gets no phone number.
 @immutable
 class MemberSummary {
   const MemberSummary({
     required this.memberId,
     required this.fullName,
     this.phoneNumber,
+    this.branchId,
     this.branchName,
     this.status,
+    this.accounts = const [],
   });
 
   final String memberId;
   final String fullName;
   final String? phoneNumber;
+  final String? branchId;
   final String? branchName;
   final MembershipStatus? status;
+  final List<MemberAccountSummary> accounts;
 
   static MemberSummary? fromJson(Object? json) {
     if (json is! Map<String, dynamic>) return null;
@@ -96,45 +105,26 @@ class MemberSummary {
     final name =
         _fullName(json['firstName'], json['middleName'], json['lastName']);
     if (id == null || name.isEmpty) return null;
+    final accounts = json['accounts'];
     return MemberSummary(
       memberId: id,
       fullName: name,
       phoneNumber: _text(json['phoneNumber']),
+      branchId: _text(json['branchId']),
       branchName: _text(json['branchName']),
       status: MembershipStatus.parse(json['membershipStatus']),
+      accounts: accounts is List
+          ? accounts
+              .map(MemberAccountSummary.fromJson)
+              .whereType<MemberAccountSummary>()
+              .toList()
+          : const [],
     );
   }
 }
 
-/// One page of search results.
-@immutable
-class MemberSearchPage {
-  const MemberSearchPage({
-    required this.items,
-    required this.page,
-    required this.total,
-  });
-
-  final List<MemberSummary> items;
-  final int page;
-
-  /// How many members match in all, across pages.
-  final int total;
-
-  static MemberSearchPage? fromJson(Object? json) {
-    if (json is! Map<String, dynamic>) return null;
-    final items = json['items'];
-    final page = json['page'];
-    final total = json['total'];
-    if (items is! List || page is! int || total is! int) return null;
-    return MemberSearchPage(
-      items: items.map(MemberSummary.fromJson).whereType<MemberSummary>()
-          .toList(),
-      page: page,
-      total: total,
-    );
-  }
-}
+/// One page of member search results.
+typedef MemberSearchPage = PagedResult<MemberSummary>;
 
 /// One of a member's accounts. Balances aren't sent (backend decision).
 @immutable

@@ -221,7 +221,7 @@ void main() {
   });
 
   testWidgets('more results load on request', (tester) async {
-    final members = withAma()..searchTotal = 3;
+    final members = withAma()..searchTotal = MemberApi.pageSize + 1;
     await pumpPage(tester, members);
     await search(tester, 'Mensah');
 

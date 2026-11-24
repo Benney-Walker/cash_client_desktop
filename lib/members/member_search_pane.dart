@@ -40,6 +40,7 @@ class _MemberSearchPaneState extends State<MemberSearchPane> {
   List<MemberSummary> _results = const [];
   int _total = 0;
   int _page = 0;
+  bool _hasMore = false;
   bool _loading = false;
   bool _loadingMore = false;
   Object? _error;
@@ -60,6 +61,7 @@ class _MemberSearchPaneState extends State<MemberSearchPane> {
         _searched = '';
         _results = const [];
         _total = 0;
+        _hasMore = false;
         _loading = false;
         _error = null;
       });
@@ -80,8 +82,9 @@ class _MemberSearchPaneState extends State<MemberSearchPane> {
       setState(() {
         _searched = query;
         _results = page.items;
-        _total = page.total;
-        _page = page.page;
+        _total = page.totalElements;
+        _page = page.number;
+        _hasMore = page.hasMore;
       });
     } catch (error) {
       if (!mounted || number != _searchNumber) return;
@@ -105,8 +108,9 @@ class _MemberSearchPaneState extends State<MemberSearchPane> {
       if (!mounted || number != _searchNumber) return;
       setState(() {
         _results = [..._results, ...page.items];
-        _total = page.total;
-        _page = page.page;
+        _total = page.totalElements;
+        _page = page.number;
+        _hasMore = page.hasMore;
       });
     } catch (error) {
       if (!mounted || number != _searchNumber) return;
@@ -221,7 +225,7 @@ class _MemberSearchPaneState extends State<MemberSearchPane> {
                         selected: member.memberId == widget.selectedId,
                         onTap: () => widget.onSelect(member.memberId),
                       ),
-                    if (_results.length < _total)
+                    if (_hasMore)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton(
