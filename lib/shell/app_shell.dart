@@ -7,6 +7,7 @@ import '../auth/profile_controller.dart';
 import '../common/brand_mark.dart';
 import '../common/gradient_backdrop.dart';
 import '../config/app_config.dart';
+import '../dashboard/dashboard_page.dart';
 import '../members/members_page.dart';
 import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
@@ -51,6 +52,23 @@ class _AppShellState extends State<AppShell> {
   static const double _expandedWidth = 248;
 
   AppSection _section = AppSection.dashboard;
+
+  /// The Approvals tab to open, set when a dashboard card leads there.
+  int _approvalsTab = 0;
+
+  void _openFromDashboard(DashboardTarget target) {
+    final (section, tab) = switch (target) {
+      DashboardTarget.submissions => (AppSection.submissions, 0),
+      DashboardTarget.idDocuments => (AppSection.approvals, 0),
+      DashboardTarget.memberUpdates => (AppSection.approvals, 1),
+      DashboardTarget.loanApplications => (AppSection.loans, 0),
+      DashboardTarget.pendingMembers => (AppSection.members, 0),
+    };
+    setState(() {
+      _section = section;
+      _approvalsTab = tab;
+    });
+  }
 
   bool get _isAdministrator =>
       widget.session.role == StaffRole.administrator;
@@ -99,8 +117,10 @@ class _AppShellState extends State<AppShell> {
                 onToggle: widget.sidebar.toggle,
               ),
               selectedIndex: sections.indexOf(current),
-              onDestinationSelected: (index) =>
-                  setState(() => _section = sections[index]),
+              onDestinationSelected: (index) => setState(() {
+                _section = sections[index];
+                _approvalsTab = 0;
+              }),
               destinations: [
                 for (final section in sections)
                   NavigationRailDestination(
@@ -132,8 +152,18 @@ class _AppShellState extends State<AppShell> {
             isAdministrator: _isAdministrator,
           ),
         AppSection.approvals => ApprovalsPage(
+            key: ValueKey('approvals-$_approvalsTab'),
             api: widget.apis.approvals,
             isAdministrator: _isAdministrator,
+            initialTab: _approvalsTab,
+          ),
+        AppSection.dashboard => DashboardPage(
+            api: widget.apis.dashboard,
+            branchApi: widget.apis.branches,
+            staffName: widget.session.staffName,
+            isAdministrator: _isAdministrator,
+            scopeBranch: _scopeBranch,
+            onOpen: _openFromDashboard,
           ),
         AppSection.transactions => TransactionsPage(
             api: widget.apis.transactions,

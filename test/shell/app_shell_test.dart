@@ -84,7 +84,30 @@ void main() {
   testWidgets('sections without screens say so', (tester) async {
     await pumpShell(tester);
 
+    await tester.tap(find.text('Loans'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Not built yet'), findsOneWidget);
+  });
+
+  testWidgets('a dashboard card opens its page and tab', (tester) async {
+    await pumpShell(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('dashboard.card.memberUpdates')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('page.approvals')), findsOneWidget);
+    expect(rail(tester).selectedIndex, AppSection.approvals.index);
+    final tabs = tester.widget<TabBar>(find.byType(TabBar));
+    expect(tabs.controller!.index, 1);
+
+    // From the sidebar, Approvals opens on its first tab again.
+    await tester.tap(find.text('Members'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Approvals'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TabBar>(find.byType(TabBar)).controller!.index, 0);
   });
 
   testWidgets('Staff opens the staff page with Add staff', (tester) async {

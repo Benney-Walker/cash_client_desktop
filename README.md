@@ -50,11 +50,12 @@ Receipts print the credit union's name from
 | Approvals | ✅ K2: sidebar item with ID documents and Member updates tabs (waiting counts), each a queue beside its review pane. ID picture with zoom and rotate; Approve, and Reject with a common reason or your own; member updates compared side by side. Administrators only (Agents see a note) |
 | Member contact details | ✅ Administrators edit phone, address and occupation directly from member details; Agents send a change for approval and see their latest request's outcome on the member |
 | Roles and branch | ✅ Agents don't see Approvals. The staff member's branch (from `GET /api/staff/v1/me`, read once per sign-in) shows on the Account and lock cards, and Agents see "… branch only" on Staff and Daily submissions. A changed role signs the staff member out with an explanation (found at unlock or after a 403) |
+| Dashboard | ✅ D3 layout, content D-C: headline with the period's deposits and withdrawals and what's waiting; waiting cards that open their page (Approvals on the right tab); totals by type and loans now. Today, this week or this month; Administrators can narrow to one branch. All figures from existing report and list endpoints |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
 | Daily submissions (S3) | ✅ Waiting and Approved lists; a day's totals and payments; cash-count helper (cedi notes and 50p/20p coins) with a running total that turns green at the expected cash; Approve off while short, surplus approved directly; lost answers retried with the same count |
-| Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
+| Collectors, Loans and Reports | Not started: backend ready; each starts with design options (build plan Phases 8–10) |
 
 ### Sidebar sections
 
@@ -63,8 +64,8 @@ submissions, Loans, Staff, Settings. The grouping and order are a first proposal
 Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
 withdrawals, deposits, share purchases and transfers; collector
 withdrawal requests were removed from the system on 2026-11-15. Settings,
-Members, Transactions, Approvals, Daily submissions and Staff have
-screens so far. Agents see every section except Approvals, which the
+Dashboard, Members, Transactions, Approvals, Daily submissions and Staff
+have screens so far. Agents see every section except Approvals, which the
 backend keeps to Administrators.
 
 ## Design decisions
@@ -124,6 +125,7 @@ lib/
   members/             Members page, Register member steps, member API and models
   staff/               Staff page, Add staff steps, staff API and models
   approvals/           Approvals queues, ID picture viewer, review API
+  dashboard/           Dashboard page and the figures it reads
   branches/            branch list API, branch model and picker
   api/                 backend errors, the authenticated HTTP client, Apis bundle
   auth/                sign-in API, session, gate, sign-in screen
@@ -198,6 +200,9 @@ test/                  mirrors lib/
 - **2026-11-24** Roles in the app (Phase 6): profile from `/me` once per
   sign-in, branch on the Account and lock cards and on Agents' branch
   pages (B2), Approvals hidden from Agents, sign-out when roles change.
+- **2026-11-24** Dashboard (Phase 7, D-C): figures from the report
+  endpoints and list totals; period switch; Administrators' branch picker;
+  cards open their pages. New `DashboardApi` in the `Apis` bundle.
 
 ## Known limitations
 

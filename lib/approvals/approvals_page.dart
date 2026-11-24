@@ -22,10 +22,15 @@ class ApprovalsPage extends StatefulWidget {
     super.key,
     required this.api,
     required this.isAdministrator,
+    this.initialTab = 0,
   });
 
   final ApprovalApi api;
   final bool isAdministrator;
+
+  /// 0 for ID documents, 1 for Member updates (the dashboard's cards open
+  /// one or the other).
+  final int initialTab;
 
   @override
   State<ApprovalsPage> createState() => _ApprovalsPageState();
@@ -33,7 +38,11 @@ class ApprovalsPage extends StatefulWidget {
 
 class _ApprovalsPageState extends State<ApprovalsPage>
     with SingleTickerProviderStateMixin {
-  late final _tabs = TabController(length: 2, vsync: this)
+  late final _tabs = TabController(
+    length: 2,
+    vsync: this,
+    initialIndex: widget.initialTab.clamp(0, 1),
+  )
     ..addListener(() {
       if (mounted) setState(() {});
     });

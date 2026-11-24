@@ -6,6 +6,7 @@ import 'package:cash_client_desktop/approvals/approval_api.dart';
 import 'package:cash_client_desktop/auth/auth_api.dart';
 import 'package:cash_client_desktop/auth/auth_session.dart';
 import 'package:cash_client_desktop/branches/branch_api.dart';
+import 'package:cash_client_desktop/dashboard/dashboard_api.dart';
 import 'package:cash_client_desktop/members/member_api.dart';
 import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
@@ -851,7 +852,105 @@ Apis fakeApis() {
     transactions: FakeTransactionBackend().api,
     submissions: FakeSubmissionBackend().api,
     approvals: FakeApprovalBackend().api,
+    dashboard: FakeDashboardBackend().api,
   );
+}
+
+/// The endpoints the dashboard reads: the three reports and the lists it
+/// counts. [failing] lists path endings that answer 500.
+class FakeDashboardBackend {
+  FakeDashboardBackend();
+
+  final requests = <http.Request>[];
+  final failing = <String>{};
+
+  /// Totals by type, as the transactions report sends them.
+  List<Map<String, dynamic>> totals = [
+    {'type': 'DEPOSIT', 'count': 4, 'amount': 1500.00, 'fees': 0},
+    {'type': 'WITHDRAWAL', 'count': 2, 'amount': 300.00, 'fees': 4.00},
+  ];
+
+  /// The list totals by path ending.
+  final counts = <String, int>{
+    DashboardApi.submissionsPath: 3,
+    DashboardApi.kycReviewsPath: 2,
+    DashboardApi.memberUpdatesPath: 1,
+    DashboardApi.loanApplicationsPath: 1,
+    DashboardApi.membersPath: 4,
+  };
+
+  /// The query of the last request to [path].
+  Map<String, String> lastQuery(String path) =>
+      requests.lastWhere((r) => r.url.path.endsWith(path)).url.queryParameters;
+
+  int callsTo(String path) =>
+      requests.where((r) => r.url.path.endsWith(path)).length;
+
+  late final http.Client _client = MockClient((request) async {
+    requests.add(request);
+    final path = request.url.path;
+    if (path.endsWith(BranchApi.branchesPath)) {
+      return http.Response(defaultBranchesJson(), 200);
+    }
+    if (failing.any(path.endsWith)) {
+      return http.Response(errorBody(500, 'Boom'), 500);
+    }
+    if (path.endsWith(DashboardApi.transactionsReportPath)) {
+      final count = totals.fold<num>(0, (n, t) => n + (t['count'] as num));
+      final amount = totals.fold<num>(0, (n, t) => n + (t['amount'] as num));
+      final fees = totals.fold<num>(0, (n, t) => n + (t['fees'] as num));
+      return http.Response(
+        jsonEncode({
+          'from': request.url.queryParameters['from'],
+          'to': request.url.queryParameters['to'],
+          'branchId': null,
+          'branchName': null,
+          'rows': [],
+          'totals': totals,
+          'count': count,
+          'amount': amount,
+          'fees': fees,
+        }),
+        200,
+      );
+    }
+    if (path.endsWith(DashboardApi.collectionsReportPath)) {
+      return http.Response(
+        jsonEncode({
+          'days': [],
+          'submissions': [],
+          'collected': 860.00,
+          'expected': 860.00,
+          'counted': 860.00,
+          'surplus': 0,
+        }),
+        200,
+      );
+    }
+    if (path.endsWith(DashboardApi.loanPortfolioPath)) {
+      return http.Response(
+        jsonEncode({
+          'asOf': '2026-11-25T10:00:00',
+          'loans': [],
+          'activeLoans': 5,
+          'overdueLoans': 1,
+          'amountLent': 12000.00,
+          'outstanding': 8000.00,
+          'overdue': 450.00,
+        }),
+        200,
+      );
+    }
+    for (final entry in counts.entries) {
+      if (path.endsWith(entry.key)) {
+        return http.Response(pagedJson([], total: entry.value, size: 1), 200);
+      }
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final DashboardApi api = DashboardApi(baseUrl: testBaseUrl, client: _client);
+  late final BranchApi branchApi = BranchApi(baseUrl: testBaseUrl, client: _client);
 }
 
 /// A daily-submissions backend. Approve takes the next answer from
