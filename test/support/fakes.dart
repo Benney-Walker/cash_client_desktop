@@ -10,6 +10,7 @@ import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
 import 'package:cash_client_desktop/shell/sidebar_state_store.dart';
 import 'package:cash_client_desktop/staff/staff_api.dart';
+import 'package:cash_client_desktop/submissions/submission_api.dart';
 import 'package:cash_client_desktop/transactions/transaction_api.dart';
 import 'package:cash_client_desktop/transactions/transaction_models.dart';
 import 'package:flutter/material.dart';
@@ -474,7 +475,131 @@ Apis fakeApis() {
     members: FakeMemberBackend().api,
     branches: staff.branchApi,
     transactions: FakeTransactionBackend().api,
+    submissions: FakeSubmissionBackend().api,
   );
+}
+
+/// A daily-submissions backend. Approve takes the next answer from
+/// [approveAnswers]; when those run out it approves (refusing a short count
+/// as the backend does). An answer of null means the connection drops.
+class FakeSubmissionBackend {
+  final waiting = <Map<String, dynamic>>[];
+  final approved = <Map<String, dynamic>>[];
+  final approveAnswers = <(int, String)?>[];
+
+  /// (submissionId, countedAmount) of every approval sent.
+  final approvals = <(String, num)>[];
+  final listCalls = <(String, int)>[];
+
+  static Map<String, dynamic> submissionJson(
+    String id, {
+    String collector = 'Yaw Owusu',
+    num expected = 2310,
+    String status = 'SUBMITTED',
+    int failedCount = 0,
+    num failedAmount = 0,
+    num? counted,
+    num? overage,
+  }) =>
+      {
+        'submissionId': id,
+        'collectorStaffId': 'STF0031',
+        'collectorName': collector,
+        'branchName': 'Tarkwa',
+        'status': status,
+        'submittedAt': '2026-11-24T16:40:00',
+        'paymentCount': 2,
+        'expectedAmount': expected,
+        'failedCount': failedCount,
+        'failedAmount': failedAmount,
+        'countedAmount': counted,
+        'overageAmount': overage,
+        'approvedByStaffId': status == 'APPROVED' ? 'STF0012' : null,
+        'approvedAt': status == 'APPROVED' ? '2026-11-24T17:00:00' : null,
+        'payments': [
+          {
+            'transactionId': 'p1',
+            'type': 'SAVINGS',
+            'accountNumber': '2004567',
+            'memberName': 'Ama Mensah',
+            'amount': 50,
+            'status': 'COMPLETED',
+            'failureReason': null,
+            'createdAt': '2026-11-24T09:12:00',
+          },
+          {
+            'transactionId': 'p2',
+            'type': 'SHARES',
+            'accountNumber': '1001234',
+            'memberName': 'Kofi Boateng',
+            'amount': 20,
+            'status': 'FAILED',
+            'failureReason': 'Account is INACTIVE',
+            'createdAt': '2026-11-24T10:30:00',
+          },
+        ],
+      };
+
+  Map<String, dynamic>? _find(String id) {
+    for (final s in [...waiting, ...approved]) {
+      if (s['submissionId'] == id) return s;
+    }
+    return null;
+  }
+
+  late final http.Client _client = MockClient((request) async {
+    final path = request.url.path;
+    if (!path.startsWith(SubmissionApi.path)) {
+      return http.Response(errorBody(404, 'Not found'), 404);
+    }
+    final rest = path.substring(SubmissionApi.path.length);
+    if (rest.isEmpty) {
+      final status = request.url.queryParameters['status'] ?? 'SUBMITTED';
+      final page = int.parse(request.url.queryParameters['page'] ?? '0');
+      listCalls.add((status, page));
+      final rows = status == 'APPROVED' ? approved : waiting;
+      return http.Response(
+        pagedJson(rows, page: page, size: SubmissionApi.pageSize),
+        200,
+      );
+    }
+    final parts = rest.split('/').where((p) => p.isNotEmpty).toList();
+    final submission = _find(parts.first);
+    if (submission == null) {
+      return http.Response(errorBody(404, 'Submission not found'), 404);
+    }
+    if (parts.length == 2 && parts[1] == 'approve') {
+      final counted = (jsonDecode(request.body) as Map)['countedAmount'] as num;
+      approvals.add((parts.first, counted));
+      if (approveAnswers.isNotEmpty) {
+        final answer = approveAnswers.removeAt(0);
+        if (answer == null) throw http.ClientException('connection dropped');
+        return http.Response(answer.$2, answer.$1);
+      }
+      final expected = submission['expectedAmount'] as num;
+      if (counted < expected) {
+        return http.Response(
+          errorBody(409, 'The cash counted is short of the expected amount'),
+          409,
+        );
+      }
+      final done = {
+        ...submission,
+        'status': 'APPROVED',
+        'countedAmount': counted,
+        'overageAmount': counted - expected,
+        'approvedByStaffId': 'STF0012',
+        'approvedAt': '2026-11-24T17:00:00',
+      };
+      waiting.removeWhere((s) => s['submissionId'] == parts.first);
+      approved.insert(0, done);
+      return http.Response(jsonEncode(done), 200);
+    }
+    return http.Response(jsonEncode(submission), 200);
+  });
+
+  late final SubmissionApi api =
+      SubmissionApi(baseUrl: testBaseUrl, client: _client);
 }
 
 /// A counter backend: accounts by number, their history, the (proposed)

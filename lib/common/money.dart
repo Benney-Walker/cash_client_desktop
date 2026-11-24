@@ -38,6 +38,10 @@ class Money implements Comparable<Money> {
 
   Money operator +(Money other) => Money.pesewas(pesewas + other.pesewas);
   Money operator -(Money other) => Money.pesewas(pesewas - other.pesewas);
+  bool operator <(Money other) => pesewas < other.pesewas;
+  bool operator <=(Money other) => pesewas <= other.pesewas;
+  bool operator >(Money other) => pesewas > other.pesewas;
+  bool operator >=(Money other) => pesewas >= other.pesewas;
 
   /// The value to send: a JSON number such as 1250.5. A double prints its
   /// shortest exact form, which the backend reads as an exact decimal.

@@ -10,6 +10,7 @@ import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
 import '../settings/theme_controller.dart';
 import '../staff/staff_page.dart';
+import '../submissions/submissions_page.dart';
 import '../theme/app_gradients.dart';
 import '../transactions/transactions_page.dart';
 import 'app_section.dart';
@@ -109,6 +110,7 @@ class _AppShellState extends State<AppShell> {
             staffId: widget.session.staffId,
             creditUnionName: AppConfig.creditUnionName,
           ),
+        AppSection.submissions => SubmissionsPage(api: widget.apis.submissions),
         AppSection.staff => StaffPage(
             session: widget.session,
             api: widget.apis.staff,

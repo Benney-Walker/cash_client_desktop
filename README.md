@@ -49,6 +49,7 @@ Receipts print the credit union's name from
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
+| Daily submissions (S3) | ✅ Waiting and Approved lists; a day's totals and payments; cash-count helper (cedi notes and 50p/20p coins) with a running total that turns green at the expected cash; Approve off while short, surplus approved directly; lost answers retried with the same count |
 | Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -58,7 +59,8 @@ Staff, Settings. The grouping and order are a first proposal.
 Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
 withdrawals, deposits, share purchases and transfers; collector
 withdrawal requests were removed from the system on 2026-11-15. Settings,
-Members, Transactions and Staff (Add staff) have screens so far, and every section is shown to both roles until
+Members, Transactions, Daily submissions and Staff (Add staff) have
+screens so far, and every section is shown to both roles until
 each section's role rules are confirmed.
 
 ## Design decisions
@@ -178,6 +180,8 @@ test/                  mirrors lib/
   purchase and transfer with review, idempotency and A4 receipts. Sidebar
   "Withdrawals" renamed "Transactions". Added `pdf` and `printing`; new
   build define `CREDIT_UNION_NAME` for the receipt heading.
+- **2026-11-24** Daily submissions (Phase 3, S3): list, details, cash-count
+  helper and approval against `/api/transaction/v1/collector-submissions`.
 
 ## Known limitations
 

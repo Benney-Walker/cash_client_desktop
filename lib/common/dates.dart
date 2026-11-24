@@ -19,3 +19,10 @@ DateTime? parseIsoDate(String text) {
   }
   return date;
 }
+
+/// `HH:mm`, such as 16:05.
+String clockTime(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+/// `yyyy-MM-dd HH:mm`.
+String dateAndTime(DateTime t) => '${isoDate(t)} ${clockTime(t)}';
