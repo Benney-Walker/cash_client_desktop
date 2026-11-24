@@ -24,8 +24,19 @@ class SessionManager extends ChangeNotifier {
   bool _endedByServer = false;
   String? _signOutNotice;
   Future<String>? _refreshing;
+  int _signInCount = 0;
 
   AuthSession? get session => _session;
+
+  /// Goes up with every successful sign-in, unlocks included, but not with
+  /// token refreshes, so listeners can tell a new sign-in from a refresh.
+  int get signInCount => _signInCount;
+
+  /// Shown on the sign-in screen when an administrator changed the staff
+  /// member's roles during their session (owner decision 24 November 2026:
+  /// sign them out).
+  static const rolesChangedNotice = 'Your roles were changed by an '
+      'administrator. Sign in again to continue.';
 
   /// True when the backend refused the session, as opposed to the staff
   /// member signing out. The sign-in screen uses it to explain why they're
@@ -54,7 +65,18 @@ class SessionManager extends ChangeNotifier {
       throw const NotOfficeStaffException();
     }
     final previous = _session;
+    if (previous != null &&
+        previous.staffId == session.staffId &&
+        !setEquals(previous.roles.toSet(), session.roles.toSet())) {
+      // Unlocking found different roles: sign out rather than carry on
+      // with a session that started under the old ones.
+      _logOutQuietly(session);
+      _logOutQuietly(previous);
+      _clear(endedByServer: false, notice: rolesChangedNotice);
+      return;
+    }
     _session = session;
+    _signInCount++;
     _endedByServer = false;
     _signOutNotice = null;
     notifyListeners();

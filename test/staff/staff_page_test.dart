@@ -9,14 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fakes.dart';
 
-const agentSession = AuthSession(
-  staffId: 'STF0020',
-  staffName: 'EFUA ASANTE',
-  roles: ['AGENT'],
-  accessToken: 'a',
-  refreshToken: 'r',
-);
-
 void main() {
   late FakeStaffBackend backend;
 

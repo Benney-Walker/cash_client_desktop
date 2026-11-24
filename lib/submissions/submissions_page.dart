@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../common/branch_chip.dart';
 import '../common/dates.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_backdrop.dart';
@@ -20,9 +21,13 @@ import 'submission_models.dart';
 /// cash can't be approved, so Approve stays off until the count reaches
 /// it. A surplus is approved directly and recorded by the backend.
 class SubmissionsPage extends StatefulWidget {
-  const SubmissionsPage({super.key, required this.api});
+  const SubmissionsPage({super.key, required this.api, this.scopeBranch});
 
   final SubmissionApi api;
+
+  /// An Agent's branch: the backend lists only its collectors' days, so the
+  /// title says so (option B2).
+  final String? scopeBranch;
 
   @override
   State<SubmissionsPage> createState() => _SubmissionsPageState();
@@ -100,7 +105,6 @@ class _SubmissionsPageState extends State<SubmissionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final selected = _selectedId;
 
     return Stack(
@@ -112,11 +116,7 @@ class _SubmissionsPageState extends State<SubmissionsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Daily submissions',
-                style: textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
+              PageTitle('Daily submissions', scopeBranch: widget.scopeBranch),
               const SizedBox(height: 20),
               Expanded(
                 child: Row(

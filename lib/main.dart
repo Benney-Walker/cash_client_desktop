@@ -7,6 +7,7 @@ import 'auth/auth_api.dart';
 import 'auth/auth_gate.dart';
 import 'auth/inactivity_lock.dart';
 import 'auth/lock_layer.dart';
+import 'auth/profile_controller.dart';
 import 'auth/session_manager.dart';
 import 'config/app_config.dart';
 import 'settings/app_info.dart';
@@ -35,10 +36,16 @@ Future<void> main() async {
   // Every call to a protected endpoint goes through this client, which adds
   // the access token and refreshes it when it expires.
   final client = AuthenticatedClient(http.Client(), sessions);
+  final apis = Apis.connect(baseUrl: AppConfig.apiBaseUrl, client: client);
+  // The signed-in staff member's own profile (branch, current roles); a 403
+  // anywhere makes it check whether their roles changed.
+  final profile = ProfileController(sessions: sessions, fetch: apis.staff.fetchMe);
+  client.onForbidden = profile.checkRoles;
 
   runApp(CashClientApp(
     sessions: sessions,
-    apis: Apis.connect(baseUrl: AppConfig.apiBaseUrl, client: client),
+    profile: profile,
+    apis: apis,
     lock: InactivityLock(),
     theme: theme,
     sidebar: sidebar,
@@ -50,6 +57,7 @@ class CashClientApp extends StatelessWidget {
   const CashClientApp({
     super.key,
     required this.sessions,
+    this.profile,
     required this.apis,
     required this.lock,
     required this.theme,
@@ -58,6 +66,7 @@ class CashClientApp extends StatelessWidget {
   });
 
   final SessionManager sessions;
+  final ProfileController? profile;
   final Apis apis;
   final InactivityLock lock;
   final ThemeController theme;
@@ -76,9 +85,15 @@ class CashClientApp extends StatelessWidget {
         themeMode: theme.mode,
         // Above the navigator, so the lock covers dialogs as well as pages.
         builder: (context, child) =>
-            LockLayer(sessions: sessions, lock: lock, child: child!),
+            LockLayer(
+              sessions: sessions,
+              profile: profile,
+              lock: lock,
+              child: child!,
+            ),
         home: AuthGate(
           sessions: sessions,
+          profile: profile,
           apis: apis,
           theme: theme,
           sidebar: sidebar,

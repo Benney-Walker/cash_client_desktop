@@ -21,6 +21,7 @@ class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,
     required this.session,
+    this.branchName,
     required this.onSignOut,
     required this.theme,
     required this.sidebar,
@@ -28,6 +29,9 @@ class SettingsScreen extends StatelessWidget {
   });
 
   final AuthSession session;
+
+  /// From the staff member's profile; null until it's read.
+  final String? branchName;
   final VoidCallback onSignOut;
   final ThemeController theme;
   final SidebarController sidebar;
@@ -48,7 +52,11 @@ class SettingsScreen extends StatelessWidget {
                 key: const Key('settings.account'),
                 title: 'Account',
                 icon: Icons.person_outline,
-                child: _AccountSection(session: session, onSignOut: onSignOut),
+                child: _AccountSection(
+                  session: session,
+                  branchName: branchName,
+                  onSignOut: onSignOut,
+                ),
               ),
               const SizedBox(height: 16),
               GlassCard(
@@ -72,15 +80,17 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-/// Who is signed in, and Sign out.
-///
-/// The login response gives the name, staff ID and roles, but not the
-/// branch, and there's no endpoint for staff to read their own profile, so
-/// the branch isn't shown yet.
+/// Who is signed in, their branch (from `GET /api/staff/v1/me`, Phase 6),
+/// and Sign out.
 class _AccountSection extends StatelessWidget {
-  const _AccountSection({required this.session, required this.onSignOut});
+  const _AccountSection({
+    required this.session,
+    required this.branchName,
+    required this.onSignOut,
+  });
 
   final AuthSession session;
+  final String? branchName;
   final VoidCallback onSignOut;
 
   @override
@@ -113,6 +123,13 @@ class _AccountSection extends StatelessWidget {
                     style: textTheme.bodyMedium
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
+                  if (branchName != null)
+                    Text(
+                      '$branchName branch',
+                      key: const Key('settings.branch'),
+                      style: textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
                 ],
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_session.dart';
 import '../branches/branch_api.dart';
+import '../common/branch_chip.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
@@ -26,11 +27,16 @@ class StaffPage extends StatefulWidget {
     required this.session,
     required this.api,
     required this.branchApi,
+    this.scopeBranch,
   });
 
   final AuthSession session;
   final StaffApi api;
   final BranchApi branchApi;
+
+  /// An Agent's branch: the backend lists only its staff, so the title says
+  /// so (option B2).
+  final String? scopeBranch;
 
   @override
   State<StaffPage> createState() => _StaffPageState();
@@ -120,7 +126,6 @@ class _StaffPageState extends State<StaffPage> {
       );
     }
 
-    final textTheme = Theme.of(context).textTheme;
     StaffMember? selected;
     for (final s in _staff) {
       if (s.staffId == _selectedId) selected = s;
@@ -138,11 +143,7 @@ class _StaffPageState extends State<StaffPage> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Staff',
-                      style: textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
+                    child: PageTitle('Staff', scopeBranch: widget.scopeBranch),
                   ),
                   if (_isAdministrator)
                     GradientButton(

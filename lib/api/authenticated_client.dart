@@ -14,7 +14,8 @@ import 'api_exception.dart';
 /// client throws [ApiException] with [ApiFailure.unauthorized].
 ///
 /// A 403 is passed straight through: it means the role isn't allowed, and a
-/// new token wouldn't change that.
+/// new token wouldn't change that. It also calls [onForbidden], so the app
+/// can check whether the staff member's roles changed (Phase 6).
 ///
 /// Besides the usual [http.ClientException], [send] can throw
 /// [ApiException]: `unauthorized` when there's no session or it was just
@@ -24,6 +25,14 @@ class AuthenticatedClient extends http.BaseClient {
 
   final http.Client _inner;
   final SessionManager _sessions;
+
+  /// Called after any 403. Set once the profile controller exists.
+  void Function()? onForbidden;
+
+  http.StreamedResponse _seen(http.StreamedResponse response) {
+    if (response.statusCode == 403) onForbidden?.call();
+    return response;
+  }
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -37,11 +46,11 @@ class AuthenticatedClient extends http.BaseClient {
       request.headers['Authorization'] = 'Bearer ${session.accessToken}';
       final response = await _inner.send(request);
       if (response.statusCode == 401) await _tokenAfter401(session.accessToken);
-      return response;
+      return _seen(response);
     }
 
     final response = await _inner.send(_copy(request, session.accessToken));
-    if (response.statusCode != 401) return response;
+    if (response.statusCode != 401) return _seen(response);
 
     // Free the connection; the first answer is about to be replaced.
     await response.stream.drain<void>();
@@ -52,7 +61,7 @@ class AuthenticatedClient extends http.BaseClient {
       // be used any more (for example, the staff member was deactivated).
       _sessions.endSession();
     }
-    return retry;
+    return _seen(retry);
   }
 
   /// The token to retry with after [rejectedToken] got a 401.

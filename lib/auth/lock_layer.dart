@@ -10,6 +10,7 @@ import '../theme/app_gradients.dart';
 import '../theme/app_theme.dart';
 import 'auth_session.dart';
 import 'inactivity_lock.dart';
+import 'profile_controller.dart';
 import 'session_manager.dart';
 import 'sign_in.dart';
 
@@ -24,11 +25,15 @@ class LockLayer extends StatefulWidget {
   const LockLayer({
     super.key,
     required this.sessions,
+    this.profile,
     required this.lock,
     required this.child,
   });
 
   final SessionManager sessions;
+
+  /// For the branch on the lock card.
+  final ProfileController? profile;
   final InactivityLock lock;
   final Widget child;
 
@@ -111,7 +116,9 @@ class _LockLayerState extends State<LockLayer> {
       onPointerHover: _onPointer,
       onPointerSignal: _onPointer,
       child: ListenableBuilder(
-        listenable: Listenable.merge([widget.sessions, widget.lock]),
+        listenable: Listenable.merge(
+          [widget.sessions, widget.lock, if (widget.profile != null) widget.profile!],
+        ),
         builder: (context, child) {
           final session = widget.sessions.session;
           final locked = widget.lock.locked && session != null;
@@ -129,6 +136,7 @@ class _LockLayerState extends State<LockLayer> {
                 Positioned.fill(
                   child: _LockScreen(
                     session: session,
+                    branchName: widget.profile?.branchName,
                     timeout: widget.lock.timeout,
                     onUnlock: _unlock,
                     onSignOut: widget.sessions.signOut,
@@ -146,12 +154,14 @@ class _LockLayerState extends State<LockLayer> {
 class _LockScreen extends StatelessWidget {
   const _LockScreen({
     required this.session,
+    this.branchName,
     required this.timeout,
     required this.onUnlock,
     required this.onSignOut,
   });
 
   final AuthSession session;
+  final String? branchName;
   final Duration timeout;
   final Future<String?> Function(String password) onUnlock;
   final VoidCallback onSignOut;
@@ -173,6 +183,7 @@ class _LockScreen extends StatelessWidget {
                 type: MaterialType.transparency,
                 child: _LockCard(
                   session: session,
+                  branchName: branchName,
                   timeout: timeout,
                   onUnlock: onUnlock,
                   onSignOut: onSignOut,
@@ -189,12 +200,14 @@ class _LockScreen extends StatelessWidget {
 class _LockCard extends StatefulWidget {
   const _LockCard({
     required this.session,
+    this.branchName,
     required this.timeout,
     required this.onUnlock,
     required this.onSignOut,
   });
 
   final AuthSession session;
+  final String? branchName;
   final Duration timeout;
   final Future<String?> Function(String password) onUnlock;
   final VoidCallback onSignOut;
@@ -269,8 +282,12 @@ class _LockCardState extends State<_LockCard> {
               ),
             ),
             Text(
-              [if (role != null) role.label, widget.session.staffId]
-                  .join(' · '),
+              [
+                if (role != null) role.label,
+                widget.session.staffId,
+                if (widget.branchName != null) widget.branchName!,
+              ].join(' · '),
+              key: const Key('lock.staffDetails'),
               textAlign: TextAlign.center,
               style: textTheme.bodySmall
                   ?.copyWith(color: scheme.onSurfaceVariant),

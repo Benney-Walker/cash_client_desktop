@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:cash_client_desktop/auth/auth_api.dart';
 import 'package:cash_client_desktop/auth/inactivity_lock.dart';
+import 'package:cash_client_desktop/auth/profile_controller.dart';
 import 'package:cash_client_desktop/auth/session_manager.dart';
+import 'package:cash_client_desktop/auth/staff_profile.dart';
 import 'package:cash_client_desktop/main.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
 import 'package:cash_client_desktop/shell/sidebar_controller.dart';
@@ -46,7 +48,7 @@ void main() {
         }),
       );
 
-  Future<void> pumpSignedIn(WidgetTester tester) async {
+  Future<void> pumpSignedIn(WidgetTester tester, {bool withProfile = false}) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -56,6 +58,16 @@ void main() {
     loginRoles = ['ADMINISTRATOR'];
     lock = InactivityLock(now: () => now);
     sessions = SessionManager(api: backend());
+    final profile = withProfile
+        ? ProfileController(
+            sessions: sessions,
+            fetch: () async => StaffProfile(
+              staffId: 'STF0012',
+              roles: loginRoles.toSet(),
+              branchName: 'Tarkwa',
+            ),
+          )
+        : null;
     final theme = ThemeController(MemoryThemeModeStore());
     await theme.load();
     final sidebar = SidebarController(MemorySidebarStateStore());
@@ -64,6 +76,7 @@ void main() {
     await tester.pumpWidget(
       CashClientApp(
         sessions: sessions,
+        profile: profile,
         apis: fakeApis(),
         lock: lock,
         theme: theme,
@@ -246,5 +259,27 @@ void main() {
     // The lock is drawn above the navigator, so the dialog is behind it.
     expect(lockScreen, findsOneWidget);
     expect(dialogTaps, 0);
+  });
+
+  testWidgets('the lock card shows the branch from the profile',
+      (tester) async {
+    await pumpSignedIn(tester, withProfile: true);
+
+    await goIdle(tester);
+
+    expect(find.text('Administrator · STF0012 · Tarkwa'), findsOneWidget);
+  });
+
+  testWidgets('unlocking with changed roles signs out and explains',
+      (tester) async {
+    await pumpSignedIn(tester);
+    await goIdle(tester);
+
+    loginRoles = ['AGENT'];
+    await unlockWith(tester, 'right');
+
+    expect(lockScreen, findsNothing);
+    expect(sessions.session, isNull);
+    expect(find.text(SessionManager.rolesChangedNotice), findsOneWidget);
   });
 }

@@ -137,7 +137,10 @@ class FakeRefreshApi {
   /// Status and body to answer with. Change it between calls if needed.
   (int, String) refresh;
   final Duration delay;
-  final List<String> loginRoles;
+
+  /// The roles each sign-in gets; change it to simulate an administrator
+  /// changing them between sign-ins.
+  List<String> loginRoles;
   int calls = 0;
 
   /// When true, the refresh call fails as if there were no connection.
@@ -194,6 +197,15 @@ class FakeRefreshApi {
   static (int, String) refuses() =>
       (401, errorBody(401, 'Invalid refresh token'));
 }
+
+/// A signed-in agent, for widget tests that need one.
+const agentSession = AuthSession(
+  staffId: 'STF0020',
+  staffName: 'EFUA ASANTE',
+  roles: ['AGENT'],
+  accessToken: 'access-token',
+  refreshToken: 'refresh-token',
+);
 
 /// A signed-in administrator, for widget tests that need a session.
 const adminSession = AuthSession(

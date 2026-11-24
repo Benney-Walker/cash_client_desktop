@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/apis.dart';
 import '../approvals/approvals_page.dart';
 import '../auth/auth_session.dart';
+import '../auth/profile_controller.dart';
 import '../common/brand_mark.dart';
 import '../common/gradient_backdrop.dart';
 import '../config/app_config.dart';
@@ -24,6 +25,7 @@ class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.session,
+    this.profile,
     required this.onSignOut,
     required this.apis,
     required this.theme,
@@ -32,6 +34,9 @@ class AppShell extends StatefulWidget {
   });
 
   final AuthSession session;
+
+  /// The signed-in staff member's profile, for their branch.
+  final ProfileController? profile;
   final VoidCallback onSignOut;
   final Apis apis;
   final ThemeController theme;
@@ -50,15 +55,31 @@ class _AppShellState extends State<AppShell> {
   bool get _isAdministrator =>
       widget.session.role == StaffRole.administrator;
 
+  List<AppSection> get _sections => AppSection.visibleTo(widget.session.role);
+
+  String? get _branchName => widget.profile?.branchName;
+
+  /// Agents' branch, for the "… branch only" chip on pages the backend
+  /// limits to it (option B2). Null for Administrators, who see every
+  /// branch, and until the profile is read.
+  String? get _scopeBranch => _isAdministrator ? null : _branchName;
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.sidebar,
+      listenable: Listenable.merge(
+        [widget.sidebar, if (widget.profile != null) widget.profile!],
+      ),
       builder: (context, _) => _buildLayout(widget.sidebar.expanded),
     );
   }
 
   Widget _buildLayout(bool expanded) {
+    final sections = _sections;
+    // A section this role can't use (only possible if the session changed
+    // underneath) falls back to the dashboard.
+    final current =
+        sections.contains(_section) ? _section : AppSection.dashboard;
     return Scaffold(
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,11 +98,11 @@ class _AppShellState extends State<AppShell> {
                 expanded: expanded,
                 onToggle: widget.sidebar.toggle,
               ),
-              selectedIndex: _section.index,
+              selectedIndex: sections.indexOf(current),
               onDestinationSelected: (index) =>
-                  setState(() => _section = AppSection.values[index]),
+                  setState(() => _section = sections[index]),
               destinations: [
-                for (final section in AppSection.values)
+                for (final section in sections)
                   NavigationRailDestination(
                     icon: _railIcon(section.icon, section.label, expanded),
                     selectedIcon: _railIcon(
@@ -94,7 +115,7 @@ class _AppShellState extends State<AppShell> {
               ],
             ),
           ),
-          Expanded(child: _page(_section)),
+          Expanded(child: _page(current)),
         ],
       ),
     );
@@ -120,14 +141,19 @@ class _AppShellState extends State<AppShell> {
             staffId: widget.session.staffId,
             creditUnionName: AppConfig.creditUnionName,
           ),
-        AppSection.submissions => SubmissionsPage(api: widget.apis.submissions),
+        AppSection.submissions => SubmissionsPage(
+            api: widget.apis.submissions,
+            scopeBranch: _scopeBranch,
+          ),
         AppSection.staff => StaffPage(
             session: widget.session,
             api: widget.apis.staff,
             branchApi: widget.apis.branches,
+            scopeBranch: _scopeBranch,
           ),
         AppSection.settings => SettingsScreen(
             session: widget.session,
+            branchName: _branchName,
             onSignOut: widget.onSignOut,
             theme: widget.theme,
             sidebar: widget.sidebar,

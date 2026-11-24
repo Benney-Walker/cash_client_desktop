@@ -148,6 +148,24 @@ void main() {
     expect(sessions.session, isNotNull);
   });
 
+  test('403 tells the app so it can check for changed roles', () async {
+    var forbidden = 0;
+    final client = AuthenticatedClient(
+      FakeProtectedApi({'access-token'}, status: 403).client,
+      sessions,
+    )..onForbidden = () => forbidden++;
+
+    await postDeposit(client);
+    expect(forbidden, 1);
+
+    final ok = AuthenticatedClient(
+      FakeProtectedApi({'access-token'}).client,
+      sessions,
+    )..onForbidden = () => forbidden++;
+    await postDeposit(ok);
+    expect(forbidden, 1);
+  });
+
   test('with no session, nothing is sent', () async {
     sessions.signOut();
     final backend = FakeProtectedApi({'access-token'});

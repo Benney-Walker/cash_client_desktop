@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../api/api_call.dart';
 import '../api/api_exception.dart';
 import '../api/endpoint.dart';
+import '../auth/staff_profile.dart';
 import 'staff_models.dart';
 
 /// Calls the backend's staff endpoints. [client] should be the app's
@@ -81,6 +82,20 @@ class StaffApi {
     return json.map(StaffMember.fromJson).whereType<StaffMember>().toList()
       ..sort((a, b) =>
           a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+  }
+
+  /// `GET /api/staff/v1/me`: the signed-in staff member's own profile, with
+  /// their branch and current roles.
+  Future<StaffProfile> fetchMe() async {
+    final response = await sendChecked(
+      () => _client.get(
+        apiUri(_baseUrl, '$_staff/me'),
+        headers: const {'Accept': 'application/json'},
+      ),
+      timeout: timeout,
+    );
+    return StaffProfile.fromJson(decodeJson(response.body)) ??
+        (throw unexpectedOk());
   }
 
   /// `GET /api/staff/v1/staff-details/{staffId}`.

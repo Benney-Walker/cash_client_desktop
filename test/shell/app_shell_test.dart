@@ -1,3 +1,7 @@
+import 'package:cash_client_desktop/auth/auth_session.dart';
+import 'package:cash_client_desktop/auth/profile_controller.dart';
+import 'package:cash_client_desktop/auth/session_manager.dart';
+import 'package:cash_client_desktop/auth/staff_profile.dart';
 import 'package:cash_client_desktop/settings/theme_controller.dart';
 import 'package:cash_client_desktop/shell/app_section.dart';
 import 'package:cash_client_desktop/shell/app_shell.dart';
@@ -11,7 +15,12 @@ import '../support/fakes.dart';
 void main() {
   late MemorySidebarStateStore sidebarStore;
 
-  Future<void> pumpShell(WidgetTester tester, {bool? savedExpanded}) async {
+  Future<void> pumpShell(
+    WidgetTester tester, {
+    bool? savedExpanded,
+    AuthSession session = adminSession,
+    ProfileController? profile,
+  }) async {
     // Roughly a small laptop screen, so the expanded sidebar and a page fit.
     tester.view.physicalSize = const Size(1280, 720);
     tester.view.devicePixelRatio = 1;
@@ -25,7 +34,8 @@ void main() {
       MaterialApp(
         theme: AppTheme.light,
         home: AppShell(
-          session: adminSession,
+          session: session,
+          profile: profile,
           onSignOut: () {},
           apis: fakeApis(),
           theme: ThemeController(MemoryThemeModeStore()),
@@ -137,5 +147,90 @@ void main() {
 
     expect(find.byKey(const Key('settings.rememberSidebar')), findsOneWidget);
     expect(find.byKey(const Key('settings.about')), findsOneWidget);
+  });
+
+  group('roles (Phase 6)', () {
+    List<String?> labels(WidgetTester tester) => [
+          for (final d in rail(tester).destinations) (d.label as Text).data,
+        ];
+
+    testWidgets('agents don\'t see Approvals', (tester) async {
+      await pumpShell(tester, session: agentSession);
+
+      expect(labels(tester), isNot(contains('Approvals')));
+      expect(
+        labels(tester),
+        [for (final s in AppSection.visibleTo(StaffRole.agent)) s.label],
+      );
+      expect(labels(tester), hasLength(AppSection.values.length - 1));
+
+      // Indexes follow the shorter list.
+      await tester.tap(find.text('Staff'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('page.staff')), findsOneWidget);
+    });
+
+    testWidgets('administrators see Approvals', (tester) async {
+      await pumpShell(tester);
+
+      expect(labels(tester), contains('Approvals'));
+      await tester.tap(find.text('Approvals'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('page.approvals')), findsOneWidget);
+    });
+
+    Future<ProfileController> signedIn(List<String> roles) async {
+      final auth = FakeRefreshApi(FakeRefreshApi.refuses(), loginRoles: roles);
+      final sessions = SessionManager(api: auth.api);
+      final profile = ProfileController(
+        sessions: sessions,
+        fetch: () async => StaffProfile(
+          staffId: 'STF0020',
+          roles: roles.toSet(),
+          branchName: 'Tarkwa',
+        ),
+      );
+      await sessions.signIn(staffId: 'STF0020', password: 'x');
+      return profile;
+    }
+
+    testWidgets('agents see their branch on branch pages and in Settings',
+        (tester) async {
+      final profile = await signedIn(['AGENT']);
+      await pumpShell(tester, session: agentSession, profile: profile);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Staff'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tarkwa branch only'), findsOneWidget);
+
+      await tester.tap(find.text('Daily submissions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tarkwa branch only'), findsOneWidget);
+
+      await tester.tap(find.text('Members'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('branchScope')), findsNothing);
+
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('settings.branch')), findsOneWidget);
+      expect(find.text('Tarkwa branch'), findsOneWidget);
+    });
+
+    testWidgets('administrators get no branch chip but see their branch',
+        (tester) async {
+      final profile = await signedIn(['ADMINISTRATOR']);
+      await pumpShell(tester, profile: profile);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Staff'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('branchScope')), findsNothing);
+
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tarkwa branch'), findsOneWidget);
+    });
   });
 }

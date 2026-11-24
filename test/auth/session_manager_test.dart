@@ -366,4 +366,32 @@ void main() {
           isFalse);
     });
   });
+
+  group('unlocking with changed roles', () {
+    test('signs out with an explanation and ends both sessions', () async {
+      final auth = FakeRefreshApi(FakeRefreshApi.refuses());
+      final sessions = SessionManager(api: auth.api);
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+      final first = sessions.signInCount;
+
+      auth.loginRoles = ['AGENT'];
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+      await settle();
+
+      expect(sessions.session, isNull);
+      expect(sessions.signInNotice, SessionManager.rolesChangedNotice);
+      expect(sessions.signInCount, first);
+      expect(auth.loggedOut, containsAll(['refresh-token', 'refresh-token-2']));
+    });
+
+    test('the same roles carry on and count a new sign-in', () async {
+      final auth = FakeRefreshApi(FakeRefreshApi.refuses());
+      final sessions = SessionManager(api: auth.api);
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      expect(sessions.session, isNotNull);
+      expect(sessions.signInCount, 2);
+    });
+  });
 }
