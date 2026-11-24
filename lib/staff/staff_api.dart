@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -42,6 +43,150 @@ class StaffApi {
       timeout: timeout,
     );
   }
+
+  static const _staff = '/api/staff/v1';
+
+  Future<StaffMember> _member(Future<http.Response> Function() request) async {
+    final response = await sendChecked(request, timeout: timeout);
+    return StaffMember.fromJson(decodeJson(response.body)) ??
+        (throw unexpectedOk());
+  }
+
+  Future<http.Response> _postEmpty(String path) => _client.post(
+        apiUri(_baseUrl, path),
+        headers: const {'Accept': 'application/json'},
+      );
+
+  Future<http.Response> _putJson(String path, Object body) => _client.put(
+        apiUri(_baseUrl, path),
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+  /// `GET /api/staff/v1/all-staff`: everyone for an Administrator, their
+  /// own branch for an Agent. Sorted here by name.
+  Future<List<StaffMember>> listStaff() async {
+    final response = await sendChecked(
+      () => _client.get(
+        apiUri(_baseUrl, '$_staff/all-staff'),
+        headers: const {'Accept': 'application/json'},
+      ),
+      timeout: timeout,
+    );
+    final json = decodeJson(response.body);
+    if (json is! List) throw unexpectedOk();
+    return json.map(StaffMember.fromJson).whereType<StaffMember>().toList()
+      ..sort((a, b) =>
+          a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+  }
+
+  /// `GET /api/staff/v1/staff-details/{staffId}`.
+  Future<StaffMember> fetchStaff(String staffId) => _member(
+        () => _client.get(
+          apiUri(_baseUrl, '$_staff/staff-details/${Uri.encodeComponent(staffId)}'),
+          headers: const {'Accept': 'application/json'},
+        ),
+      );
+
+  /// `PUT /api/staff/v1/update-staff/{staffId}` (Administrators).
+  Future<StaffMember> updateProfile(String staffId, StaffProfileUpdate update) =>
+      _member(() => _putJson(
+            '$_staff/update-staff/${Uri.encodeComponent(staffId)}',
+            update.toJson(),
+          ));
+
+  /// `PUT /api/staff/v1/update-roles/{staffId}` (Administrators): replaces
+  /// the roles. The backend keeps at least one active Administrator, one
+  /// active Agent per branch, and refuses removing your own Administrator
+  /// role.
+  Future<StaffMember> updateRoles(String staffId, Set<StaffRoleOption> roles) =>
+      _member(() => _putJson(
+            '$_staff/update-roles/${Uri.encodeComponent(staffId)}',
+            {
+              'roles': [
+                for (final r in StaffRoleOption.values)
+                  if (roles.contains(r)) r.backendName,
+              ],
+            },
+          ));
+
+  /// `POST /api/staff/v1/deactivate/{staffId}` (Administrators): signs them
+  /// out everywhere.
+  Future<StaffMember> deactivate(String staffId) => _member(
+      () => _postEmpty('$_staff/deactivate/${Uri.encodeComponent(staffId)}'));
+
+  /// `POST /api/staff/v1/reactivate/{staffId}` (Administrators).
+  Future<StaffMember> reactivate(String staffId) => _member(
+      () => _postEmpty('$_staff/reactivate/${Uri.encodeComponent(staffId)}'));
+
+  /// `POST /api/admin/v1/staff/{staffId}/unlock` (Administrators): clears a
+  /// lock from 5 wrong passwords.
+  Future<StaffMember> unlock(String staffId) => _member(() => _postEmpty(
+      '/api/admin/v1/staff/${Uri.encodeComponent(staffId)}/unlock'));
+
+  /// `POST /api/staff/v1/collectors/{staffId}/release-device`: frees a
+  /// collector's registered phone and signs them out everywhere; their next
+  /// sign-in registers the new phone. Agents for their own branch,
+  /// Administrators for all. Answers 204.
+  Future<void> releaseDevice(String staffId) async {
+    final http.Response response;
+    try {
+      response = await _postEmpty(
+        '$_staff/collectors/${Uri.encodeComponent(staffId)}/release-device',
+      ).timeout(timeout);
+    } on TimeoutException {
+      throw const ApiException(ApiFailure.network);
+    } on http.ClientException {
+      throw const ApiException(ApiFailure.network);
+    }
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw ApiException.fromResponse(response.statusCode, response.body);
+    }
+  }
+}
+
+/// A message for a failed staff action. The backend's 409 reasons are
+/// written for staff ("You cannot deactivate your own account", "Branch
+/// Tarkwa already has an active agent", …), so they're shown as they are,
+/// with clearer words for the duplicate checks.
+String staffActionErrorMessage(Object error) {
+  if (error is! ApiException) return 'Something went wrong. Try again.';
+  final message = error.message?.trim() ?? '';
+  final lower = message.toLowerCase();
+  if (error.failure == ApiFailure.conflict) {
+    if (lower.contains('phone number already')) {
+      return 'Another staff member already uses this phone number.';
+    }
+    if (lower.contains('email already')) {
+      return 'Another staff member already uses this email address.';
+    }
+    if (lower.contains('staff already exist')) {
+      return 'Another staff member has this name and date of birth.';
+    }
+  }
+  if (error.failure == ApiFailure.notFound) {
+    return 'This staff member no longer exists.';
+  }
+  if ((error.failure == ApiFailure.conflict ||
+          error.failure == ApiFailure.validation ||
+          error.failure == ApiFailure.forbidden) &&
+      message.isNotEmpty) {
+    return message.endsWith('.') ? message : '$message.';
+  }
+  return switch (error.failure) {
+    ApiFailure.forbidden => 'Only administrators can do this.',
+    ApiFailure.network =>
+      "Couldn't reach the server. Check your connection and try again.",
+    ApiFailure.server => 'The server had a problem. Try again in a few minutes.',
+    ApiFailure.notConfigured =>
+      'This build has no server address. It needs to be rebuilt with '
+          'API_BASE_URL.',
+    ApiFailure.unauthorized => 'Your session has ended. Sign in again.',
+    _ => "The server sent a response the app didn't understand.",
+  };
 }
 
 /// Which step of Add staff a failure belongs to, so the review step can

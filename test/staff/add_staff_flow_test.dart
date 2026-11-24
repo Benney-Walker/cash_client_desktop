@@ -77,15 +77,16 @@ void main() {
   }
 
   group('Staff page', () {
-    testWidgets('administrators see Add staff above the placeholder',
+    testWidgets('administrators see Add staff above the list',
         (tester) async {
       await pumpStaff(tester);
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('staff.add')), findsOneWidget);
-      expect(find.byKey(const Key('staff.listPlaceholder')), findsOneWidget);
+      expect(find.byKey(const Key('staff.search')), findsOneWidget);
     });
 
-    testWidgets('agents see the placeholder only', (tester) async {
+    testWidgets('agents see the list without Add staff', (tester) async {
       await pumpStaff(
         tester,
         session: const AuthSession(
@@ -97,8 +98,10 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const Key('staff.add')), findsNothing);
-      expect(find.byKey(const Key('staff.listPlaceholder')), findsOneWidget);
+      expect(find.byKey(const Key('staff.search')), findsOneWidget);
     });
   });
 

@@ -45,7 +45,8 @@ Receipts print the credit union's name from
 | Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. "Forgot password?" (R1) under the password field opens the backend's reset page (`/password-reset`, staff ID filled in) in the browser; new staff set their first password there |
 | Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`, keeping the rotated refresh token) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings ends the session on the backend (`POST /api/auth/v1/logout`); a locked account (5 wrong passwords) gets the backend's own message, and the lock screen signs it out with that message |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
-| Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
+| Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations) |
+| Staff list and actions | ✅ St2: list (search by name or staff ID, Role and Status filters) beside the chosen staff member's details. Administrators: Unlock, Edit details, Change roles, Release phone, Deactivate (asks first, never yourself) and Reactivate. Agents: view their branch's staff and Release phone (asks first) |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
@@ -59,7 +60,7 @@ Staff, Settings. The grouping and order are a first proposal.
 Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
 withdrawals, deposits, share purchases and transfers; collector
 withdrawal requests were removed from the system on 2026-11-15. Settings,
-Members, Transactions, Daily submissions and Staff (Add staff) have
+Members, Transactions, Daily submissions and Staff have
 screens so far, and every section is shown to both roles until
 each section's role rules are confirmed.
 
@@ -182,6 +183,10 @@ test/                  mirrors lib/
   build define `CREDIT_UNION_NAME` for the receipt heading.
 - **2026-11-24** Daily submissions (Phase 3, S3): list, details, cash-count
   helper and approval against `/api/transaction/v1/collector-submissions`.
+- **2026-11-24** Staff management (Phase 4, St2): staff list with search and
+  filters beside the details; edit, roles, unlock, deactivate, reactivate
+  and release phone, with Agents limited to release phone. Role tile
+  shared with Add staff.
 
 ## Known limitations
 
@@ -204,6 +209,10 @@ test/                  mirrors lib/
   proposed in CASH_CLIENT_DESKTOP.md §18 and not on the backend yet. Until
   then search says it isn't offered, and the details page shows what the
   backend sends without Upload ID document.
+- The backend still lets Agents call staff update, roles, deactivate and
+  reactivate (CASH_CLIENT_DESKTOP.md §14); the app only hides them. Staff
+  with both Administrator and Agent roles get just their own branch's
+  staff list from the backend (§23).
 - The Account card can't show the branch: the login response doesn't
   include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.

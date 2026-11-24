@@ -8,7 +8,7 @@ import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
 import '../common/step_flow.dart';
 import '../theme/app_gradients.dart';
-import '../theme/app_theme.dart';
+import 'role_tile.dart';
 import 'staff_api.dart';
 import 'staff_models.dart';
 
@@ -556,7 +556,8 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
                         if (role != StaffRoleOption.values.first)
                           const SizedBox(width: 12),
                         Expanded(
-                          child: _RoleTile(
+                          child: RoleTile(
+                            keyPrefix: 'addStaff',
                             role: role,
                             selected: _roles.contains(role),
                             onTap: () {
@@ -680,87 +681,6 @@ class _AddStaffFlowState extends State<AddStaffFlow> {
 
 /// A role that can be ticked. Shows a checkbox as well as the colour, so the
 /// choice doesn't rely on colour alone.
-class _RoleTile extends StatelessWidget {
-  const _RoleTile({
-    required this.role,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final StaffRoleOption role;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final foreground =
-        selected ? scheme.onPrimaryContainer : scheme.onSurface;
-    final secondary =
-        selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-
-    return Semantics(
-      checked: selected,
-      button: true,
-      child: Material(
-        color: selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.controlRadius),
-          side: BorderSide(
-            color: selected ? scheme.primary : scheme.outline,
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: InkWell(
-          key: Key('addStaff.role.${role.name}'),
-          borderRadius: BorderRadius.circular(AppTheme.controlRadius),
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints:
-                const BoxConstraints(minHeight: AppTheme.minTouchTarget),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    selected
-                        ? Icons.check_box
-                        : Icons.check_box_outline_blank,
-                    size: 20,
-                    color: selected ? scheme.primary : scheme.outline,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          role.label,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: foreground,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          role.hint,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: secondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Shown after the backend accepted the new staff member.
 class _AddedCard extends StatelessWidget {
   const _AddedCard({

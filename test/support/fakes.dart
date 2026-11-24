@@ -231,30 +231,143 @@ String defaultBranchesJson() => jsonEncode([
 
 /// A staff backend: lists [branches] and answers add-staff with
 /// [addStatus] and [addBody]. [requests] collects what the app sent.
+/// A staff record as the backend sends it (`StaffResponse`).
+Map<String, Object?> staffJson(
+  String staffId,
+  String firstName,
+  String lastName, {
+  List<String> roles = const ['AGENT'],
+  String status = 'ACTIVE',
+  String branchName = 'Tarkwa Market',
+  String? lockedAt,
+  String? deviceRegisteredAt,
+}) =>
+    {
+      'staffId': staffId,
+      'firstName': firstName,
+      'middleName': null,
+      'lastName': lastName,
+      'dateOfBirth': '1990-05-04',
+      'phoneNumber': '+233241234567',
+      'email': '${firstName.toLowerCase()}@example.com',
+      'residentialAddress': 'Hse 4, Tarkwa',
+      'branchId': 'b-1',
+      'branchName': branchName,
+      'deviceRegisteredAt': deviceRegisteredAt,
+      'lockedAt': lockedAt,
+      'status': status,
+      'roles': roles,
+    };
+
+/// A staff backend: add-staff, the branch list, and the staff list with
+/// its actions. The actions change [staff] the way the backend does. Set
+/// [actionStatus] to make every action fail with that status and
+/// [actionMessage].
 class FakeStaffBackend {
   FakeStaffBackend({
     this.branchesStatus = 200,
     this.addStatus = 200,
     this.addBody = '',
-  });
+    List<Map<String, Object?>>? staff,
+  }) : staff = staff ?? defaultStaff();
 
   int branchesStatus;
   int addStatus;
   String addBody;
+  int listStatus = 200;
+  int? actionStatus;
+  String actionMessage = 'Not allowed';
+
+  /// When false, reading a record back after a release fails.
+  bool detailsWork = true;
+
   final requests = <http.Request>[];
+  final List<Map<String, Object?>> staff;
 
   String branches = defaultBranchesJson();
 
+  static List<Map<String, Object?>> defaultStaff() => [
+        staffJson('STF0012', 'Kofi', 'Mensah', roles: ['ADMINISTRATOR']),
+        staffJson('STF0020', 'Efua', 'Asante'),
+        staffJson('STF0031', 'Yaw', 'Boateng',
+            roles: ['COLLECTOR'], deviceRegisteredAt: '2026-11-02T09:15:00'),
+        staffJson('STF0044', 'Akosua', 'Darko',
+            roles: ['COLLECTOR'], lockedAt: '2026-11-23T16:40:00'),
+        staffJson('STF0050', 'Kwame', 'Owusu', status: 'INACTIVE'),
+      ];
+
+  Map<String, Object?>? _find(String id) {
+    for (final s in staff) {
+      if (s['staffId'] == id) return s;
+    }
+    return null;
+  }
+
+  http.Response _record(Map<String, Object?> s) =>
+      http.Response(jsonEncode(s), 200);
+
   late final http.Client _client = MockClient((request) async {
     requests.add(request);
-    if (request.url.path.endsWith(BranchApi.branchesPath)) {
+    final path = request.url.path;
+    final id = Uri.decodeComponent(request.url.pathSegments.last);
+    if (path.endsWith(BranchApi.branchesPath)) {
       return http.Response(
         branchesStatus == 200 ? branches : errorBody(branchesStatus, 'Not found'),
         branchesStatus,
       );
     }
-    if (request.url.path.endsWith('/api/staff/v1/add-staff')) {
+    if (path.endsWith('/api/staff/v1/add-staff')) {
       return http.Response(addBody, addStatus);
+    }
+    if (path.endsWith('/api/staff/v1/all-staff')) {
+      return listStatus == 200
+          ? http.Response(jsonEncode(staff), 200)
+          : http.Response(errorBody(listStatus, 'Failed'), listStatus);
+    }
+    if (path.contains('/api/staff/v1/staff-details/')) {
+      final s = _find(id);
+      if (s == null || !detailsWork) {
+        return http.Response(errorBody(404, 'Not found'), 404);
+      }
+      return _record(s);
+    }
+
+    // Actions. The release path ends in "release-device", the unlock path
+    // in "unlock"; the staff ID is the segment before.
+    final segments = request.url.pathSegments;
+    final actionId = path.endsWith('/release-device') || path.endsWith('/unlock')
+        ? Uri.decodeComponent(segments[segments.length - 2])
+        : id;
+    final s = _find(actionId);
+    if (s == null) return http.Response(errorBody(404, 'Not found'), 404);
+    final failing = actionStatus;
+    if (failing != null) {
+      return http.Response(errorBody(failing, actionMessage), failing);
+    }
+    if (path.contains('/update-staff/')) {
+      s.addAll((jsonDecode(request.body) as Map<String, dynamic>)
+        ..remove('middleName'));
+      return _record(s);
+    }
+    if (path.contains('/update-roles/')) {
+      s['roles'] = (jsonDecode(request.body) as Map<String, dynamic>)['roles'];
+      return _record(s);
+    }
+    if (path.contains('/deactivate/')) {
+      s['status'] = 'INACTIVE';
+      return _record(s);
+    }
+    if (path.contains('/reactivate/')) {
+      s['status'] = 'ACTIVE';
+      return _record(s);
+    }
+    if (path.endsWith('/unlock')) {
+      s['lockedAt'] = null;
+      return _record(s);
+    }
+    if (path.endsWith('/release-device')) {
+      s['deviceRegisteredAt'] = null;
+      return http.Response('', 204);
     }
     return http.Response(errorBody(404, 'Not found'), 404);
   });
@@ -267,6 +380,14 @@ class FakeStaffBackend {
   Map<String, dynamic> get lastAdd => jsonDecode(
         requests.lastWhere((r) => r.url.path.endsWith('/add-staff')).body,
       ) as Map<String, dynamic>;
+
+  /// The paths of the requests other than the list and branch reads.
+  List<String> get actionPaths => [
+        for (final r in requests)
+          if (!r.url.path.endsWith('/all-staff') &&
+              !r.url.path.endsWith(BranchApi.branchesPath))
+            '${r.method} ${r.url.path}',
+      ];
 }
 
 /// What a fake member backend saw of one upload.
