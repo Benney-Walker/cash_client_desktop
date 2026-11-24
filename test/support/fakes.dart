@@ -9,6 +9,7 @@ import 'package:cash_client_desktop/branches/branch_api.dart';
 import 'package:cash_client_desktop/collectors/collector_api.dart';
 import 'package:cash_client_desktop/dashboard/dashboard_api.dart';
 import 'package:cash_client_desktop/loans/loan_api.dart';
+import 'package:cash_client_desktop/reports/report_api.dart';
 import 'package:cash_client_desktop/members/member_api.dart';
 import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
@@ -857,7 +858,125 @@ Apis fakeApis() {
     dashboard: FakeDashboardBackend().api,
     collectors: FakeCollectorBackend().api,
     loans: FakeLoanBackend().api,
+    reports: FakeReportBackend().api,
   );
+}
+
+/// The report endpoints: the three reports (JSON and PDF), statements, the
+/// audit log and the trial balance. [failing] lists path endings that
+/// answer [failStatus].
+class FakeReportBackend {
+  FakeReportBackend();
+
+  final requests = <http.Request>[];
+  final failing = <String>{};
+  int failStatus = 500;
+  String failMessage = 'Boom';
+
+  /// A tiny but valid-looking PDF.
+  static final pdfBytes = Uint8List.fromList(utf8.encode('%PDF-1.4 fake'));
+
+  List<Map<String, dynamic>> auditEntries = [
+    for (var i = 0; i < 3; i++)
+      {
+        'id': 100 - i,
+        'occurredAt': '2026-11-24T1$i:00:00Z',
+        'actorStaffId': i == 2 ? null : 'STF0012',
+        'action': ['LOAN_APPROVED', 'LOGIN_FAILED', 'KYC_AUTO_VERIFIED'][i],
+        'targetType': ['LOAN_APPLICATION', 'STAFF', 'MEMBER'][i],
+        'targetId': ['app-1', 'STF0020', 'm-1'][i],
+        'details': i == 0 ? 'GHS 2000.00 paid in' : null,
+      },
+  ];
+  int auditTotal = 3;
+  bool balanced = true;
+
+  Map<String, String> lastQuery(String ending) =>
+      requests.lastWhere((r) => r.url.path.endsWith(ending)).url.queryParameters;
+
+  int callsTo(String ending) =>
+      requests.where((r) => r.url.path.endsWith(ending)).length;
+
+  late final http.Client _client = MockClient((request) async {
+    requests.add(request);
+    final path = request.url.path;
+    if (path.endsWith(BranchApi.branchesPath)) {
+      return http.Response(defaultBranchesJson(), 200);
+    }
+    if (failing.any(path.endsWith) ||
+        (failing.contains(ReportApi.statementPath) &&
+            path.startsWith(ReportApi.statementPath))) {
+      return http.Response(errorBody(failStatus, failMessage), failStatus);
+    }
+    if (path.endsWith('/pdf') || path.startsWith('${ReportApi.statementPath}/')) {
+      return http.Response.bytes(pdfBytes, 200, headers: {'content-type': 'application/pdf'});
+    }
+    http.Response json(Object body) => http.Response(jsonEncode(body), 200);
+    if (path == ReportApi.transactionsPath) {
+      return json({
+        'rows': [
+          {'date': '2026-11-24', 'branchName': 'Tarkwa', 'type': 'DEPOSIT', 'count': 4, 'amount': 1500, 'fees': 0},
+          {'date': '2026-11-24', 'branchName': 'Tarkwa', 'type': 'WITHDRAWAL', 'count': 2, 'amount': 300, 'fees': 4},
+        ],
+        'totals': [
+          {'type': 'DEPOSIT', 'count': 4, 'amount': 1500, 'fees': 0},
+          {'type': 'WITHDRAWAL', 'count': 2, 'amount': 300, 'fees': 4},
+        ],
+        'count': 6,
+        'amount': 1800,
+        'fees': 4,
+      });
+    }
+    if (path == ReportApi.collectionsPath) {
+      return json({
+        'days': [
+          {'date': '2026-11-24', 'collectorStaffId': 'STF0031', 'collectorName': 'Yaw Boateng', 'branchName': 'Tarkwa', 'payments': 12, 'amount': 1250, 'failedPayments': 1, 'failedAmount': 50},
+        ],
+        'submissions': [
+          {'submittedAt': '2026-11-24T17:40:00', 'collectorStaffId': 'STF0031', 'collectorName': 'Yaw Boateng', 'branchName': 'Tarkwa', 'payments': 12, 'expected': 1250, 'failedPayments': 1, 'counted': 1255, 'surplus': 5, 'status': 'APPROVED', 'approvedBy': 'STF0020', 'approvedAt': '2026-11-24T18:00:00'},
+        ],
+        'collected': 1250,
+        'expected': 1250,
+        'counted': 1255,
+        'surplus': 5,
+      });
+    }
+    if (path == ReportApi.portfolioPath) {
+      return json({
+        'asOf': '2026-11-24T18:00:00',
+        'loans': [
+          {'loanId': 'loan-1', 'memberName': 'Ama Owusu', 'branchName': 'Tarkwa', 'productName': 'Salary advance', 'disbursementDate': '2026-10-24', 'amount': 2000, 'totalToRepay': 2240, 'paid': 373.33, 'outstanding': 1866.67, 'overdue': 0, 'nextDueDate': '2026-12-24'},
+        ],
+        'activeLoans': 1,
+        'overdueLoans': 0,
+        'amountLent': 2000,
+        'outstanding': 1866.67,
+        'overdue': 0,
+      });
+    }
+    if (path == ReportApi.auditLogPath) {
+      final page = int.parse(request.url.queryParameters['page'] ?? '0');
+      return http.Response(
+        pagedJson(page == 0 ? auditEntries : [], page: page, total: auditTotal, size: ReportApi.auditPageSize),
+        200,
+      );
+    }
+    if (path == ReportApi.trialBalancePath) {
+      return json({
+        'accounts': [
+          {'accountCode': '1010', 'name': 'Cash on hand', 'category': 'ASSET', 'totalDebits': 5000, 'totalCredits': 1200, 'balance': 3800},
+          {'accountCode': '2010', 'name': 'Member savings', 'category': 'LIABILITY', 'totalDebits': 1200, 'totalCredits': 5000, 'balance': 3800},
+        ],
+        'totalDebits': 6200,
+        'totalCredits': balanced ? 6200 : 6100,
+        'balanced': balanced,
+      });
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final ReportApi api = ReportApi(baseUrl: testBaseUrl, client: _client);
+  late final BranchApi branchApi = BranchApi(baseUrl: testBaseUrl, client: _client);
 }
 
 /// A loan product as the backend sends it (`LoanProductResponse`).

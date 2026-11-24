@@ -6,6 +6,8 @@ import '../approvals/approval_api.dart' show ApprovalApi;
 import '../loans/loan_api.dart';
 import '../loans/loan_application_flow.dart' show PickedMember;
 import '../loans/loan_widgets.dart';
+import '../reports/report_api.dart';
+import '../reports/reports_page.dart' show showStatementDialog;
 import '../common/glass_card.dart';
 import '../common/gradient_button.dart';
 import '../common/step_flow.dart';
@@ -33,6 +35,7 @@ class MemberDetailsPane extends StatefulWidget {
     required this.memberId,
     this.approvalApi,
     this.loanApi,
+    this.reportApi,
     this.onApplyForLoan,
     this.isAdministrator = false,
     this.pickImage = pickKycImageFile,
@@ -45,6 +48,9 @@ class MemberDetailsPane extends StatefulWidget {
 
   /// For the member's loans; the Loans card is left out without it.
   final LoanApi? loanApi;
+
+  /// For "Statement" beside each account; left out without it.
+  final ReportApi? reportApi;
 
   /// Opens "Apply for a loan" with this member filled in.
   final ValueChanged<PickedMember>? onApplyForLoan;
@@ -741,6 +747,21 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
                   ),
                 ),
                 if (account.status != null) accountPill(account.status!),
+                if (widget.reportApi != null)
+                  IconButton(
+                    key: Key('$_k.statement.${account.accountNumber}'),
+                    tooltip: 'Statement',
+                    onPressed: () {
+                      final now = DateTime.now();
+                      showStatementDialog(
+                        context,
+                        api: widget.reportApi!,
+                        accountNumber: account.accountNumber,
+                        today: DateTime(now.year, now.month, now.day),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined),
+                  ),
               ],
             ),
           ),

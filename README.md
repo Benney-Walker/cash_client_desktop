@@ -53,16 +53,16 @@ Receipts print the credit union's name from
 | Dashboard | ✅ D3 layout, content D-C: headline with the period's deposits and withdrawals and what's waiting; waiting cards that open their page (Approvals on the right tab); totals by type and loans now. Today, this week or this month; Administrators can narrow to one branch. All figures from existing report and list endpoints |
 | Collectors | ✅ C1: collectors with their payments for the day beside that collector's day: route on an OpenStreetMap map with payments pinned, and a timeline (payments, first and last positions, or every 5-minute position). Any day in the last 90 days. Release phone stays on Staff |
 | Loans | ✅ L1: Applications (Administrators approve with the payout confirmed, or reject with a reason), Active loans with installments, Products (Administrators edit). Apply for a loan in steps from Loans or a member's details; the cost worked out with the backend's arithmetic. Member details show the member's loans |
+| Reports | ✅ R1: Transactions, Collector collections, Loan portfolio and Statement tabs (Agents: their branch), plus Audit log and Trial balance for Administrators. Filters, figures on screen, and the backend's PDFs to save or print. Statement also beside each account on member details |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
 | Daily submissions (S3) | ✅ Waiting and Approved lists; a day's totals and payments; cash-count helper (cedi notes and 50p/20p coins) with a running total that turns green at the expected cash; Approve off while short, surplus approved directly; lost answers retried with the same count |
-| Reports and audit log | Not started: backend ready; starts with design options (build plan Phase 10) |
 
 ### Sidebar sections
 
 Dashboard, Members, Transactions, Approvals, Collectors, Daily
-submissions, Loans, Staff, Settings. The grouping and order are a first proposal.
+submissions, Loans, Reports, Staff, Settings. The grouping and order are a first proposal.
 Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
 withdrawals, deposits, share purchases and transfers; collector
 withdrawal requests were removed from the system on 2026-11-15. Settings,
@@ -129,6 +129,7 @@ lib/
   dashboard/           Dashboard page and the figures it reads
   collectors/          Collectors page, map and timeline, location API
   loans/               Loans page, apply steps, products, loan API and arithmetic
+  reports/             Reports page, PDF save and print, audit log, trial balance
   branches/            branch list API, branch model and picker
   api/                 backend errors, the authenticated HTTP client, Apis bundle
   auth/                sign-in API, session, gate, sign-in screen
@@ -214,6 +215,9 @@ test/                  mirrors lib/
   payouts, active loans, products, apply-for-a-loan steps, member Loans
   card. New `LoanApi`; the review list and reason dialog are shared with
   Approvals.
+- **2026-11-24** Reports (Phase 10, R1): three reports, statements, audit
+  log and trial balance; PDFs saved or printed. New `ReportApi`; macOS
+  entitlement changed to read-write for files the user picks.
 
 ## Known limitations
 

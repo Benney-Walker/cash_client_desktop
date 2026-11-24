@@ -26,6 +26,7 @@ enum AppSection {
     Icons.fact_check,
   ),
   loans('Loans', Icons.request_quote_outlined, Icons.request_quote),
+  reports('Reports', Icons.insert_chart_outlined, Icons.insert_chart),
   staff('Staff', Icons.groups_outlined, Icons.groups),
   settings('Settings', Icons.settings_outlined, Icons.settings);
 

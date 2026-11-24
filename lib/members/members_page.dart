@@ -4,6 +4,7 @@ import '../approvals/approval_api.dart';
 import '../branches/branch_api.dart';
 import '../loans/loan_api.dart';
 import '../loans/loan_application_flow.dart';
+import '../reports/report_api.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
@@ -24,6 +25,7 @@ class MembersPage extends StatefulWidget {
     required this.branchApi,
     this.approvalApi,
     this.loanApi,
+    this.reportApi,
     this.isAdministrator = false,
     this.pickImage = pickKycImageFile,
     this.acceptDrops = true,
@@ -38,6 +40,9 @@ class MembersPage extends StatefulWidget {
 
   /// For the member's Loans card and "Apply for a loan".
   final LoanApi? loanApi;
+
+  /// For "Statement" beside each of a member's accounts.
+  final ReportApi? reportApi;
 
   /// Administrators edit contact details directly; Agents send a request
   /// (owner decision 24 November 2026).
@@ -150,6 +155,7 @@ class _MembersPageState extends State<MembersPage> {
                               memberId: selected,
                               approvalApi: widget.approvalApi,
                               loanApi: widget.loanApi,
+                              reportApi: widget.reportApi,
                               onApplyForLoan: widget.loanApi == null
                                   ? null
                                   : (m) => setState(() => _applyingFor = m),
