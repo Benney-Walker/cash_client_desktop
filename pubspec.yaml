@@ -36,6 +36,10 @@ dependencies:
   # Opens the backend's password reset page in the browser ("Forgot
   # password?" on the sign-in screen). Flutter team plugin.
   url_launcher: ^6.3.1
+  # Printable A4 receipts after a counter transaction: pdf builds the page,
+  # printing opens the system print dialog (Windows and macOS).
+  pdf: ^3.11.1
+  printing: ^5.13.4
 
 dev_dependencies:
   flutter_test:

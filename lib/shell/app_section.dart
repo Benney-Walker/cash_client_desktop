@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 enum AppSection {
   dashboard('Dashboard', Icons.space_dashboard_outlined, Icons.space_dashboard),
   members('Members', Icons.people_outline, Icons.people),
-  withdrawals('Withdrawals', Icons.payments_outlined, Icons.payments),
+  transactions('Transactions', Icons.payments_outlined, Icons.payments),
   collectors('Collectors', Icons.badge_outlined, Icons.badge),
   submissions(
     'Daily submissions',

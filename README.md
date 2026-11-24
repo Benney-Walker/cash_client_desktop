@@ -30,6 +30,9 @@ The backend address is fixed per build, as in the mobile app:
 for this build"). Without it, signing in says the build has no server
 address.
 
+Receipts print the credit union's name from
+`--dart-define=CREDIT_UNION_NAME=…` (without it they say "Cash Client").
+
 ## Status
 
 | Area | State |
@@ -45,15 +48,17 @@ address.
 | Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
+| Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
 | Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
 
-Dashboard, Members, Withdrawals, Collectors, Daily submissions, Loans, Staff,
-Settings. The grouping and order are a first proposal. Withdrawals means
-member withdrawals recorded at the office; collector withdrawal requests
-were removed from the system on 2026-11-15. Only Settings, Members
-(Register member) and Staff (Add staff) have screens so far, and every section is shown to both roles until
+Dashboard, Members, Transactions, Collectors, Daily submissions, Loans,
+Staff, Settings. The grouping and order are a first proposal.
+Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
+withdrawals, deposits, share purchases and transfers; collector
+withdrawal requests were removed from the system on 2026-11-15. Settings,
+Members, Transactions and Staff (Add staff) have screens so far, and every section is shown to both roles until
 each section's role rules are confirmed.
 
 ## Design decisions
@@ -167,15 +172,25 @@ test/                  mirrors lib/
   browser. Locked accounts get their own message instead of the
   collectors one, and the lock screen signs them out with it. Added
   `url_launcher`.
+- **2026-11-24** Member search switched to the built
+  `/api/member/v1/search-members` (Spring `PagedModel`, one shared parser).
+- **2026-11-24** Transactions (Phase 2, T3): withdrawal, deposit, share
+  purchase and transfer with review, idempotency and A4 receipts. Sidebar
+  "Withdrawals" renamed "Transactions". Added `pdf` and `printing`; new
+  build define `CREDIT_UNION_NAME` for the receipt heading.
 
 ## Known limitations
+
+- The counter can't show the withdrawal fee or the first-deposit rules
+  before sending until the backend offers its settings
+  (CASH_CLIENT_DESKTOP.md §21); the result shows the fee charged.
 
 - The tests and `flutter analyze` haven't been run yet. The environment this
   was written in couldn't download the Flutter SDK or packages. Run
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
   `pubspec.lock` will update to add `shared_preferences`,
   `package_info_plus`, `http`, `http_parser`, `file_selector`,
-  `desktop_drop` and `url_launcher`.
+  `desktop_drop`, `url_launcher`, `pdf` and `printing`.
 - Register member and Add staff need the backend's `claude/backend-progress`
   branch (branch list, add-staff without a password). Until
   the backend reads `idempotencyKey` on add-member, a retry after a lost

@@ -10,6 +10,8 @@ import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
 import 'package:cash_client_desktop/shell/sidebar_state_store.dart';
 import 'package:cash_client_desktop/staff/staff_api.dart';
+import 'package:cash_client_desktop/transactions/transaction_api.dart';
+import 'package:cash_client_desktop/transactions/transaction_models.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -471,5 +473,135 @@ Apis fakeApis() {
     staff: staff.api,
     members: FakeMemberBackend().api,
     branches: staff.branchApi,
+    transactions: FakeTransactionBackend().api,
   );
+}
+
+/// A counter backend: accounts by number, their history, the (proposed)
+/// settings, and the four transaction endpoints. Each transaction call
+/// takes the next answer from [sendAnswers]; when those run out it records
+/// the transaction (200). An answer of null means the connection drops.
+class FakeTransactionBackend {
+  FakeTransactionBackend({this.settings});
+
+  /// The settings endpoint's answer, or null for 404 (not built yet).
+  Map<String, dynamic>? settings;
+
+  final accounts = <String, Map<String, dynamic>>{};
+  final history = <String, List<Map<String, dynamic>>>{};
+  final sendAnswers = <(int, String)?>[];
+
+  /// (path, body) of every transaction sent.
+  final sent = <(String, Map<String, dynamic>)>[];
+  int accountCalls = 0;
+
+  static Map<String, dynamic> accountJson(
+    String number, {
+    String type = 'SAVINGS',
+    String status = 'ACTIVE',
+    num available = 1250,
+    String member = 'Ama Mensah',
+  }) =>
+      {
+        'accountNumber': number,
+        'accountType': type,
+        'status': status,
+        'currentBalance': available,
+        'availableBalance': available,
+        'memberId': 'm-ama',
+        'memberName': member,
+      };
+
+  static Map<String, dynamic> recordJson({
+    String id = 'tx-1',
+    String type = 'WITHDRAWAL',
+    num amount = 100,
+    String account = '2004567',
+    String? counterparty,
+    num? fee,
+    num? share,
+    String? description,
+  }) =>
+      {
+        'transactionId': id,
+        'idempotencyKey': 'k',
+        'transactionType': type,
+        'amount': amount,
+        'accountNumber': account,
+        'counterpartyAccountNumber': counterparty,
+        'feeAmount': fee,
+        'shareAmount': share,
+        'status': 'COMPLETED',
+        'description': description,
+        'initiatedByStaffId': 'STF0012',
+        'createdAt': '2026-11-24T10:15:30',
+        'postedAt': '2026-11-24T10:15:30',
+      };
+
+  static Map<String, dynamic> settingsJson({
+    bool feeEnabled = true,
+    String feeType = 'FLAT',
+    num feeValue = 2,
+  }) =>
+      {
+        'initialShareAmount': 50,
+        'minFirstDeposit': 100,
+        'withdrawalMinBalance': 20,
+        'withdrawalDailyLimit': 10000,
+        'withdrawalFeeEnabled': feeEnabled,
+        'withdrawalFeeType': feeType,
+        'withdrawalFeeValue': feeValue,
+      };
+
+  late final http.Client _client = MockClient((request) async {
+    final path = request.url.path;
+    if (path == TransactionApi.settingsPath) {
+      final answer = settings;
+      return answer == null
+          ? http.Response(errorBody(404, 'Not found'), 404)
+          : http.Response(jsonEncode(answer), 200);
+    }
+    if (path.startsWith('${TransactionApi.accountPath}/')) {
+      accountCalls++;
+      final account = accounts[path.split('/').last];
+      return account == null
+          ? http.Response(errorBody(404, 'Account not found'), 404)
+          : http.Response(jsonEncode(account), 200);
+    }
+    if (path.startsWith('${TransactionApi.historyPath}/')) {
+      final rows = history[path.split('/').last] ?? const [];
+      return http.Response(pagedJson(rows, size: TransactionApi.historyPageSize), 200);
+    }
+    for (final kind in TransactionKind.values) {
+      if (path == kind.path) {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        sent.add((path, body));
+        final answer = sendAnswers.isEmpty
+            ? (
+                200,
+                jsonEncode(recordJson(
+                  type: switch (kind) {
+                    TransactionKind.withdrawal => 'WITHDRAWAL',
+                    TransactionKind.deposit => 'DEPOSIT',
+                    TransactionKind.sharePurchase => 'SHARES',
+                    TransactionKind.transfer => 'TRANSFER',
+                  },
+                  amount: body['amount'] as num,
+                  account: (body['accountNumber'] ?? body['fromAccountNumber'])
+                      as String,
+                  counterparty: body['toAccountNumber'] as String?,
+                  fee: kind == TransactionKind.withdrawal ? 2 : null,
+                  description: body['description'] as String?,
+                )),
+              )
+            : sendAnswers.removeAt(0);
+        if (answer == null) throw http.ClientException('connection dropped');
+        return http.Response(answer.$2, answer.$1);
+      }
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final TransactionApi api =
+      TransactionApi(baseUrl: testBaseUrl, client: _client);
 }

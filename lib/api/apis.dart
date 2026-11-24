@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../branches/branch_api.dart';
 import '../members/member_api.dart';
 import '../staff/staff_api.dart';
+import '../transactions/transaction_api.dart';
 
 /// The backend APIs the signed-in app uses, passed down together so each new
 /// one doesn't add a parameter to every screen on the way.
@@ -11,6 +12,7 @@ class Apis {
     required this.staff,
     required this.members,
     required this.branches,
+    required this.transactions,
   });
 
   /// Every API on [baseUrl] through [client], which should be the app's
@@ -23,9 +25,11 @@ class Apis {
         staff: StaffApi(baseUrl: baseUrl, client: client),
         members: MemberApi(baseUrl: baseUrl, client: client),
         branches: BranchApi(baseUrl: baseUrl, client: client),
+        transactions: TransactionApi(baseUrl: baseUrl, client: client),
       );
 
   final StaffApi staff;
   final MemberApi members;
   final BranchApi branches;
+  final TransactionApi transactions;
 }
