@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../common/money.dart';
-import '../dashboard/dashboard_models.dart' show transactionTypeLabel;
+import '../dashboard/dashboard_models.dart' show transactionTypeLabel, TypeTotal;
 
 export '../dashboard/dashboard_models.dart' show transactionTypeLabel, TypeTotal;
 
