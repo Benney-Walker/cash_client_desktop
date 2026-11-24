@@ -22,6 +22,7 @@ class SessionManager extends ChangeNotifier {
 
   AuthSession? _session;
   bool _endedByServer = false;
+  String? _signOutNotice;
   Future<String>? _refreshing;
 
   AuthSession? get session => _session;
@@ -30,6 +31,11 @@ class SessionManager extends ChangeNotifier {
   /// member signing out. The sign-in screen uses it to explain why they're
   /// there.
   bool get sessionEndedByServer => _endedByServer;
+
+  /// What the sign-in screen should explain, if anything: the reason given
+  /// to [signOut], or that the backend ended the session.
+  String? get signInNotice =>
+      _signOutNotice ?? (_endedByServer ? sessionEndedNotice : null);
 
   /// Signs an administrator or agent in.
   ///
@@ -50,6 +56,7 @@ class SessionManager extends ChangeNotifier {
     final previous = _session;
     _session = session;
     _endedByServer = false;
+    _signOutNotice = null;
     notifyListeners();
     // Unlocking signs in again, which starts a new backend session. End the
     // old one only now that the new one exists: the backend's logout also
@@ -65,9 +72,11 @@ class SessionManager extends ChangeNotifier {
   /// session (`POST /api/auth/v1/logout`) in the background. If that call
   /// fails, for example offline, the tokens are still gone from the app and
   /// the backend's session simply runs until it expires.
-  void signOut() {
+  /// [notice] is shown on the sign-in screen, for example why the app
+  /// signed them out.
+  void signOut({String? notice}) {
     final session = _session;
-    _clear(endedByServer: false);
+    _clear(endedByServer: false, notice: notice);
     if (session != null) _logOutQuietly(session);
   }
 
@@ -123,9 +132,10 @@ class SessionManager extends ChangeNotifier {
     );
   }
 
-  void _clear({required bool endedByServer}) {
+  void _clear({required bool endedByServer, String? notice}) {
     _session = null;
     _endedByServer = endedByServer;
+    _signOutNotice = notice;
     notifyListeners();
   }
 }

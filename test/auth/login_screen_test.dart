@@ -15,6 +15,7 @@ void main() {
     WidgetTester tester, {
     ThemeData? theme,
     String? notice,
+    ForgotPasswordHandler? onForgotPassword,
   }) async {
     tester.view.physicalSize = const Size(1280, 720);
     tester.view.devicePixelRatio = 1;
@@ -28,6 +29,7 @@ void main() {
         home: LoginScreen(
           appInfo: testAppInfo,
           notice: notice,
+          onForgotPassword: onForgotPassword,
           onSignIn: (staffId, password) {
             attempts.add((staffId, password));
             return result.future;
@@ -206,5 +208,55 @@ void main() {
 
     expect(find.text('Welcome back'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('Forgot password?', () {
+    final link = find.byKey(const Key('login.forgotPassword'));
+
+    testWidgets('is hidden when the screen has no reset handler',
+        (tester) async {
+      await pumpLogin(tester);
+
+      expect(link, findsNothing);
+    });
+
+    testWidgets('passes the typed staff ID, trimmed', (tester) async {
+      final asked = <String>[];
+      await pumpLogin(tester, onForgotPassword: (id) async {
+        asked.add(id);
+        return null;
+      });
+      await tester.enterText(staffId, '  STF0012 ');
+
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+
+      expect(asked, ['STF0012']);
+      expect(find.byKey(const Key('login.error')), findsNothing);
+      expect(attempts, isEmpty, reason: 'opening reset never signs in');
+    });
+
+    testWidgets('works with no staff ID typed', (tester) async {
+      final asked = <String>[];
+      await pumpLogin(tester, onForgotPassword: (id) async {
+        asked.add(id);
+        return null;
+      });
+
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+
+      expect(asked, ['']);
+    });
+
+    testWidgets('shows why it could not open', (tester) async {
+      await pumpLogin(tester,
+          onForgotPassword: (_) async => "Couldn't open your browser.");
+
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+
+      expect(find.text("Couldn't open your browser."), findsOneWidget);
+    });
   });
 }

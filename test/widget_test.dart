@@ -80,7 +80,7 @@ void main() {
 
     await signIn(tester);
 
-    expect(find.text('Wrong staff ID or password.'), findsOneWidget);
+    expect(find.textContaining('Wrong staff ID or password.'), findsOneWidget);
     expect(find.byKey(const Key('shell.sidebar')), findsNothing);
   });
 

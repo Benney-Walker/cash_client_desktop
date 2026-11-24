@@ -38,13 +38,13 @@ address.
 | Font | ✅ Inter bundled (Regular, Medium, SemiBold, Bold) |
 | Window | ✅ Opens maximised on Windows and macOS; minimum size 1280×720 |
 | Sidebar shell | ✅ Collapsible left sidebar on the light gradient panel (D3), glass highlight on the selected item, state remembered between launches (can be turned off); every section is a placeholder |
-| Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Account (name, role, staff ID, Sign out), Appearance (light/dark, remember sidebar state) and About (version, server). No Password card while reset is kept out of the app |
-| Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. No "Forgot password?" (password reset kept out of the app for now) |
-| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`, keeping the rotated refresh token) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings ends the session on the backend (`POST /api/auth/v1/logout`) |
+| Settings | ✅ One column of frosted glass cards over soft gradient glows (S3), each with a gradient icon tile: Account (name, role, staff ID, Sign out), Appearance (light/dark, remember sidebar state) and About (version, server). No Password card (reset is on the sign-in screen) |
+| Sign-in screen | ✅ Light A1 design: curved gradient panel with shield, form with checks and states, version footer. "Forgot password?" (R1) under the password field opens the backend's reset page (`/password-reset`, staff ID filled in) in the browser; new staff set their first password there |
+| Sign-in and session | ✅ Signs in with `POST /api/auth/v1/staff-login` (collectors get 403 there); only Administrators and Agents get in (both roles = Administrator); tokens kept in memory only, so staff sign in each launch; expired access tokens are refreshed automatically (`POST /api/auth/v1/refresh-staff-token`, keeping the rotated refresh token) and the request retried; a refused refresh ends the session and the sign-in screen says so; Sign out in Settings ends the session on the backend (`POST /api/auth/v1/logout`); a locked account (5 wrong passwords) gets the backend's own message, and the lock screen signs it out with that message |
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations). Staff list not built |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
-| Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. Waits on the backend's search and details additions (CASH_CLIENT_DESKTOP.md §18) |
+| Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Dashboard and all other business sections | Not started: requirements and backend contracts still open. The dashboard's layout is chosen (D3: one gradient headline card, metric cards, two sections), but what it shows isn't decided |
 
 ### Sidebar sections
@@ -162,6 +162,11 @@ test/                  mirrors lib/
   details; Upload ID document from the details; View member after
   registering. ID document fields shared between the two screens; danger
   and neutral status pills.
+- **2026-11-24** Password reset (Phase 1, option R1): "Forgot password?" on
+  the sign-in screen opens the backend's `/password-reset` page in the
+  browser. Locked accounts get their own message instead of the
+  collectors one, and the lock screen signs them out with it. Added
+  `url_launcher`.
 
 ## Known limitations
 
@@ -169,8 +174,8 @@ test/                  mirrors lib/
   was written in couldn't download the Flutter SDK or packages. Run
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
   `pubspec.lock` will update to add `shared_preferences`,
-  `package_info_plus`, `http`, `http_parser`, `file_selector` and
-  `desktop_drop`.
+  `package_info_plus`, `http`, `http_parser`, `file_selector`,
+  `desktop_drop` and `url_launcher`.
 - Register member and Add staff need the backend's `claude/backend-progress`
   branch (branch list, add-staff without a password). Until
   the backend reads `idempotencyKey` on add-member, a retry after a lost

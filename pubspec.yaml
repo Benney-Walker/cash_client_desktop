@@ -33,6 +33,9 @@ dependencies:
   # Dragging an ID picture onto Register member. Kept on 0.8: 0.9 changes
   # the API and needs Flutter 3.47.7 or later.
   desktop_drop: ^0.8.4
+  # Opens the backend's password reset page in the browser ("Forgot
+  # password?" on the sign-in screen). Flutter team plugin.
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

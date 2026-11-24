@@ -32,6 +32,13 @@ void main() {
           }
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           loginStaffIds.add(body['staffId'] as String);
+          if (body['password'] == 'locked') {
+            return http.Response(
+              errorBody(403, 'This account is locked after 5 wrong passwords. '
+                  'Ask an administrator to unlock it'),
+              403,
+            );
+          }
           if (body['password'] != 'right') {
             return http.Response(errorBody(401, 'Invalid ID or password'), 401);
           }
@@ -149,7 +156,7 @@ void main() {
 
     await unlockWith(tester, 'wrong');
 
-    expect(find.text('Wrong password. Try again.'), findsOneWidget);
+    expect(find.textContaining('Wrong password. Try again.'), findsOneWidget);
     expect(lockScreen, findsOneWidget);
   });
 
@@ -188,6 +195,20 @@ void main() {
     expect(lockScreen, findsNothing);
     expect(find.text('Welcome back'), findsOneWidget);
     expect(lock.running, isFalse);
+  });
+
+  testWidgets('a locked account signs out and says why on the sign-in screen',
+      (tester) async {
+    await pumpSignedIn(tester);
+    await goIdle(tester);
+
+    await unlockWith(tester, 'locked');
+
+    expect(lockScreen, findsNothing);
+    expect(sessions.session, isNull);
+    expect(find.byKey(const Key('login.notice')), findsOneWidget);
+    expect(find.textContaining('Ask an administrator to unlock it.'),
+        findsOneWidget);
   });
 
   testWidgets('if their office role was removed, unlocking signs them out',

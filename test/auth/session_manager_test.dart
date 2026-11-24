@@ -291,6 +291,33 @@ void main() {
     });
   });
 
+  group('signInNotice', () {
+    test('a reason given at sign-out is shown, and cleared by signing in',
+        () async {
+      final sessions = SessionManager(api: fakeAuthApi(200, loginBody()));
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      sessions.signOut(notice: 'This account is locked.');
+      expect(sessions.signInNotice, 'This account is locked.');
+
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+      expect(sessions.signInNotice, isNull);
+    });
+
+    test('a plain sign-out has no notice; a server-ended session has one',
+        () async {
+      final sessions = SessionManager(api: fakeAuthApi(200, loginBody()));
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+
+      sessions.signOut();
+      expect(sessions.signInNotice, isNull);
+
+      await sessions.signIn(staffId: 'STF001', password: 'x');
+      sessions.endSession();
+      expect(sessions.signInNotice, sessionEndedNotice);
+    });
+  });
+
   group('signInErrorMessage', () {
     test('explains who the app is for', () {
       expect(
@@ -305,13 +332,38 @@ void main() {
       }
       expect(
         signInErrorMessage(const ApiException(ApiFailure.unauthorized)),
-        'Wrong staff ID or password.',
+        startsWith('Wrong staff ID or password.'),
       );
       // The office login endpoint answers 403 for collectors.
       expect(
-        signInErrorMessage(const ApiException(ApiFailure.forbidden)),
+        signInErrorMessage(const ApiException(ApiFailure.forbidden,
+            message: 'Collectors sign in through the collector app')),
         contains('administrators and agents'),
       );
+    });
+
+    test('a locked account gets the backend\'s own words, not the '
+        'collectors message', () {
+      const locked = ApiException(
+        ApiFailure.forbidden,
+        message: 'This account is locked after 5 wrong passwords. Ask an '
+            'administrator to unlock it',
+        statusCode: 403,
+      );
+
+      expect(isAccountLocked(locked), isTrue);
+      expect(
+        signInErrorMessage(locked),
+        'This account is locked after 5 wrong passwords. Ask an '
+        'administrator to unlock it.',
+      );
+      expect(
+        isAccountLocked(const ApiException(ApiFailure.forbidden,
+            message: 'Collectors sign in through the collector app')),
+        isFalse,
+      );
+      expect(isAccountLocked(const ApiException(ApiFailure.unauthorized)),
+          isFalse);
     });
   });
 }

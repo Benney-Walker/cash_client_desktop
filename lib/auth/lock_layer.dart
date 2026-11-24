@@ -87,7 +87,14 @@ class _LockLayerState extends State<LockLayer> {
       return null;
     } on ApiException catch (e) {
       if (e.failure == ApiFailure.unauthorized) {
-        return 'Wrong password. Try again.';
+        return 'Wrong password. Try again. Too many wrong passwords in a row '
+            'lock the account.';
+      }
+      if (isAccountLocked(e)) {
+        // The lock card can't help a locked account: sign out and say why
+        // on the sign-in screen (owner decision 24 November 2026).
+        widget.sessions.signOut(notice: lockedAccountMessage(e));
+        return null;
       }
       return signInErrorMessage(e);
     } catch (e) {

@@ -13,6 +13,10 @@ typedef SignInHandler = Future<String?> Function(
   String password,
 );
 
+/// Opens password reset for [staffId] (possibly empty). Returns null when it
+/// opened, or a message to show the user.
+typedef ForgotPasswordHandler = Future<String?> Function(String staffId);
+
 /// The sign-in screen (option A1, light): the gradient panel with the shield
 /// on the left, the form on the right, and the version line in the
 /// bottom-right corner.
@@ -20,18 +24,23 @@ typedef SignInHandler = Future<String?> Function(
 /// It only collects the staff ID and password and reports the outcome;
 /// talking to the backend is up to [onSignIn].
 ///
-/// There's no "Forgot password?" link: password reset is kept out of the
-/// app for now (owner decision 13 November 2026).
+/// "Forgot password?" sits under the password field (option R1, owner
+/// decision 24 November 2026) and opens the backend's password reset page
+/// in the browser; new staff set their first password there too.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     required this.appInfo,
     required this.onSignIn,
+    this.onForgotPassword,
     this.notice,
   });
 
   final AppInfo appInfo;
   final SignInHandler onSignIn;
+
+  /// Shows the "Forgot password?" link when set.
+  final ForgotPasswordHandler? onForgotPassword;
 
   /// Shown above the form until the next sign-in attempt, for example to
   /// explain that the session ended.
@@ -55,6 +64,17 @@ class _LoginScreenState extends State<LoginScreen> {
     _staffId.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  Future<void> _forgotPassword() async {
+    final open = widget.onForgotPassword;
+    if (open == null || _busy) return;
+    final error = await open(_staffId.text.trim());
+    if (!mounted) return;
+    setState(() {
+      _error = error;
+      if (error != null) _showNotice = false;
+    });
   }
 
   Future<void> _submit() async {
@@ -195,7 +215,24 @@ class _LoginScreenState extends State<LoginScreen> {
             validator: (value) =>
                 (value == null || value.isEmpty) ? 'Enter your password' : null,
           ),
-          const SizedBox(height: 24),
+          if (widget.onForgotPassword != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Tooltip(
+                message: 'Opens the password reset page in your browser',
+                child: TextButton.icon(
+                  key: const Key('login.forgotPassword'),
+                  onPressed: _busy ? null : _forgotPassword,
+                  // Text first, then the "opens elsewhere" mark.
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('Forgot password?'),
+                ),
+              ),
+            )
+          else
+            const SizedBox(height: 8),
+          const SizedBox(height: 16),
           GradientButton(
             key: const Key('login.signIn'),
             onPressed: _busy ? null : _submit,

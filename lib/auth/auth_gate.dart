@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../api/apis.dart';
+import '../config/app_config.dart';
 import '../settings/app_info.dart';
 import '../settings/theme_controller.dart';
 import '../shell/app_shell.dart';
 import '../shell/sidebar_controller.dart';
 import 'login_screen.dart';
+import 'password_reset_link.dart';
 import 'session_manager.dart';
 import 'sign_in.dart';
 
@@ -19,6 +21,8 @@ class AuthGate extends StatefulWidget {
     required this.theme,
     required this.sidebar,
     required this.appInfo,
+    this.baseUrl = AppConfig.apiBaseUrl,
+    this.openInBrowser = openUrlInBrowser,
   });
 
   final SessionManager sessions;
@@ -26,6 +30,12 @@ class AuthGate extends StatefulWidget {
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
+
+  /// The server whose password reset page "Forgot password?" opens.
+  final String baseUrl;
+
+  /// Replaced in tests; the real one opens the default browser.
+  final OpenInBrowser openInBrowser;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -71,6 +81,20 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
+  Future<String?> _forgotPassword(String staffId) async {
+    final Uri uri;
+    try {
+      uri = passwordResetUri(widget.baseUrl, staffId: staffId);
+    } catch (_) {
+      return "Password reset can't be opened: this build has no server "
+          'address. It needs to be rebuilt with API_BASE_URL.';
+    }
+    final opened = await widget.openInBrowser(uri);
+    return opened
+        ? null
+        : "Couldn't open your browser. To reset your password, go to $uri";
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -82,7 +106,8 @@ class _AuthGateState extends State<AuthGate> {
           return LoginScreen(
             appInfo: widget.appInfo,
             onSignIn: _signIn,
-            notice: sessions.sessionEndedByServer ? sessionEndedNotice : null,
+            onForgotPassword: _forgotPassword,
+            notice: sessions.signInNotice,
           );
         }
         // Signing out shows the sign-in screen in its place, so nothing from
