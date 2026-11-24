@@ -47,6 +47,8 @@ Receipts print the credit union's name from
 | Inactivity lock | ✅ After 20 minutes without mouse or keyboard activity, a card over the dimmed app (L1) asks for the password; it covers dialogs too, unlocking signs in again with the same staff ID, and "Not you? Sign out" returns to sign-in |
 | Staff: Add staff | ✅ Four steps (F3): Personal, Contact, Role and branch, Review; Administrators only; posts to `/api/staff/v1/add-staff` without a password; success says the staff ID was sent by SMS. Waits on two backend changes (see Known limitations) |
 | Staff list and actions | ✅ St2: list (search by name or staff ID, Role and Status filters) beside the chosen staff member's details. Administrators: Unlock, Edit details, Change roles, Release phone, Deactivate (asks first, never yourself) and Reactivate. Agents: view their branch's staff and Release phone (asks first) |
+| Approvals | ✅ K2: sidebar item with ID documents and Member updates tabs (waiting counts), each a queue beside its review pane. ID picture with zoom and rotate; Approve, and Reject with a common reason or your own; member updates compared side by side. Administrators only (Agents see a note) |
+| Member contact details | ✅ Administrators edit phone, address and occupation directly from member details; Agents send a change for approval and see their latest request's outcome on the member |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
@@ -55,12 +57,12 @@ Receipts print the credit union's name from
 
 ### Sidebar sections
 
-Dashboard, Members, Transactions, Collectors, Daily submissions, Loans,
-Staff, Settings. The grouping and order are a first proposal.
+Dashboard, Members, Transactions, Approvals, Collectors, Daily
+submissions, Loans, Staff, Settings. The grouping and order are a first proposal.
 Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
 withdrawals, deposits, share purchases and transfers; collector
 withdrawal requests were removed from the system on 2026-11-15. Settings,
-Members, Transactions, Daily submissions and Staff have
+Members, Transactions, Approvals, Daily submissions and Staff have
 screens so far, and every section is shown to both roles until
 each section's role rules are confirmed.
 
@@ -120,6 +122,7 @@ lib/
   main.dart            app start-up
   members/             Members page, Register member steps, member API and models
   staff/               Staff page, Add staff steps, staff API and models
+  approvals/           Approvals queues, ID picture viewer, review API
   branches/            branch list API, branch model and picker
   api/                 backend errors, the authenticated HTTP client, Apis bundle
   auth/                sign-in API, session, gate, sign-in screen
@@ -187,6 +190,10 @@ test/                  mirrors lib/
   filters beside the details; edit, roles, unlock, deactivate, reactivate
   and release phone, with Agents limited to release phone. Role tile
   shared with Add staff.
+- **2026-11-24** Approvals (Phase 5, K2): ID document queue with the ID
+  picture, member update requests, approve and reject with reasons;
+  member contact details edited directly by Administrators or requested
+  by Agents. New `ApprovalApi` in the `Apis` bundle.
 
 ## Known limitations
 
@@ -213,6 +220,9 @@ test/                  mirrors lib/
   reactivate (CASH_CLIENT_DESKTOP.md §14); the app only hides them. Staff
   with both Administrator and Agent roles get just their own branch's
   staff list from the backend (§23).
+- Agents can't open ID records of members they registered: the backend's
+  security rule keeps `/api/admin/**` to Administrators although its KYC
+  code allows it (CASH_CLIENT_DESKTOP.md §24).
 - The Account card can't show the branch: the login response doesn't
   include it and staff can't read their own profile.
 - Windows and macOS builds haven't been run.

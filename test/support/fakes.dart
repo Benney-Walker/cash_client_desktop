@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cash_client_desktop/api/apis.dart';
+import 'package:cash_client_desktop/approvals/approval_api.dart';
 import 'package:cash_client_desktop/auth/auth_api.dart';
 import 'package:cash_client_desktop/auth/auth_session.dart';
 import 'package:cash_client_desktop/branches/branch_api.dart';
@@ -405,6 +406,196 @@ class SeenUpload {
 /// A member backend. Each call to add-member or the ID upload takes the
 /// next answer from [addAnswers] or [uploadAnswers]; when those run out it
 /// answers 200. An answer of null means the connection drops.
+/// A member update request as the backend sends it
+/// (`MemberUpdateProposalResponse`).
+Map<String, dynamic> updateRequestJson({
+  String requestId = 'req-1',
+  String memberId = FakeMemberBackend.newMemberId,
+  String memberName = 'Ama Mensah',
+  String status = 'PENDING',
+  Map<String, dynamic>? current,
+  Map<String, dynamic>? proposed,
+  String requestedBy = 'STF0020',
+  String? reviewedBy,
+  String? rejectionReason,
+}) {
+  Map<String, dynamic> values(Map<String, dynamic>? from, String phone,
+          String address, String job) =>
+      {
+        'phoneNumber': from?['phoneNumber'] ?? phone,
+        'residentialAddress': from?['residentialAddress'] ?? address,
+        'occupation': from?['occupation'] ?? job,
+      };
+  return {
+    'requestId': requestId,
+    'memberId': memberId,
+    'memberName': memberName,
+    'branchName': 'Tarkwa',
+    'status': status,
+    'current': values(current, '0241234567', 'Hse 3, Tarkwa', 'Trader'),
+    'proposed': values(proposed, '0559998887', 'Hse 3, Tarkwa', 'Trader'),
+    'requestedByStaffId': requestedBy,
+    'requestedAt': '2026-11-24T09:30:00',
+    'reviewedByStaffId': reviewedBy,
+    'reviewedAt': reviewedBy == null ? null : '2026-11-24T11:00:00',
+    'rejectionReason': rejectionReason,
+  };
+}
+
+/// An ID document record as the backend sends it (`KycRecordResponse`).
+Map<String, dynamic> kycRecordJson(
+  String memberId,
+  String firstName, {
+  String status = 'MANUAL_REVIEW',
+  String? reason = 'The name could not be read',
+}) =>
+    {
+      'memberId': memberId,
+      'firstName': firstName,
+      'lastName': 'Owusu',
+      'documentType': 'ECOWAS_CARD',
+      'idNumber': 'GHA-123456789-0',
+      'status': status,
+      'reason': reason,
+      'verificationMethod': null,
+      'reviewedByStaffId': null,
+      'registeredByStaffId': 'STF0020',
+      'submittedAt': '2026-11-22T10:15:00',
+      'verifiedAt': null,
+    };
+
+/// The Administrators' review backend: the ID document queue, the ID
+/// picture, member update requests, and approve/reject for both. Reviews
+/// change the records the way the backend does. Set [actionStatus] to make
+/// every review fail with that status and [actionMessage].
+class FakeApprovalBackend {
+  FakeApprovalBackend({List<Map<String, dynamic>>? kyc, List<Map<String, dynamic>>? updates})
+      : kyc = kyc ??
+            [
+              kycRecordJson('m-1', 'Ama'),
+              kycRecordJson('m-2', 'Kojo'),
+              kycRecordJson('m-3', 'Esi', status: 'VERIFIED', reason: null),
+            ],
+        updates = updates ??
+            [
+              updateRequestJson(requestId: 'req-1', memberId: 'm-1'),
+              updateRequestJson(
+                requestId: 'req-2',
+                memberId: 'm-4',
+                memberName: 'Yaw Mensah',
+                status: 'REJECTED',
+                reviewedBy: 'STF0012',
+                rejectionReason: 'Wrong number',
+              ),
+            ];
+
+  final List<Map<String, dynamic>> kyc;
+  final List<Map<String, dynamic>> updates;
+  int listStatus = 200;
+  int pictureStatus = 200;
+  int? actionStatus;
+  String actionMessage = 'Not allowed';
+
+  /// A tiny valid PNG (1x1).
+  static final pictureBytes = Uint8List.fromList(const [
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+    0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+    0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  final requests = <http.Request>[];
+
+  /// Each review request, as "METHOD path".
+  List<String> get actionPaths => [
+        for (final r in requests)
+          if (r.method == 'POST') 'POST ${r.url.path}',
+      ];
+
+  int get pictureCalls =>
+      requests.where((r) => r.url.path.contains('/kyc-document/')).length;
+
+  late final http.Client _client = MockClient((request) async {
+    requests.add(request);
+    final path = request.url.path;
+    final q = request.url.queryParameters;
+    final segments = request.url.pathSegments;
+    if (path.endsWith(ApprovalApi.kycReviewsPath)) {
+      if (listStatus != 200) {
+        return http.Response(errorBody(listStatus, 'Failed'), listStatus);
+      }
+      final status = q['status'] ?? 'MANUAL_REVIEW';
+      final size = int.parse(q['size'] ?? '20');
+      final page = int.parse(q['page'] ?? '0');
+      final matching = kyc.where((r) => r['status'] == status).toList();
+      return http.Response(
+        pagedJson(matching.skip(page * size).take(size).toList(),
+            page: page, total: matching.length, size: size),
+        200,
+      );
+    }
+    if (path.contains('${ApprovalApi.kycDocumentPath}/')) {
+      if (pictureStatus != 200) {
+        return http.Response(errorBody(pictureStatus, 'Nope'), pictureStatus);
+      }
+      return http.Response.bytes(pictureBytes, 200,
+          headers: {'content-type': 'image/png'});
+    }
+    if (path.endsWith(ApprovalApi.updatesPath)) {
+      if (listStatus != 200) {
+        return http.Response(errorBody(listStatus, 'Failed'), listStatus);
+      }
+      final status = q['status'] ?? 'PENDING';
+      final size = int.parse(q['size'] ?? '20');
+      final matching = updates.where((r) => r['status'] == status).toList();
+      return http.Response(
+        pagedJson(matching.take(size).toList(),
+            total: matching.length, size: size),
+        200,
+      );
+    }
+    final failing = actionStatus;
+    if (failing != null) {
+      return http.Response(errorBody(failing, actionMessage), failing);
+    }
+    if (path.contains('${ApprovalApi.kycApprovePath}/') ||
+        path.contains('${ApprovalApi.kycRejectPath}/')) {
+      final record = kyc.where((r) => r['memberId'] == segments.last).firstOrNull;
+      if (record == null) return http.Response(errorBody(404, 'Nope'), 404);
+      final approve = path.contains(ApprovalApi.kycApprovePath);
+      record['status'] = approve ? 'VERIFIED' : 'REJECTED';
+      if (!approve) {
+        record['reason'] =
+            (jsonDecode(request.body) as Map<String, dynamic>)['reason'];
+      }
+      return http.Response('{"status":"success"}', 200);
+    }
+    if (path.startsWith('${ApprovalApi.updatesPath}/')) {
+      final id = segments[segments.length - 2];
+      final record = updates.where((r) => r['requestId'] == id).firstOrNull;
+      if (record == null) return http.Response(errorBody(404, 'Nope'), 404);
+      final approve = segments.last == 'approve';
+      record['status'] = approve ? 'APPROVED' : 'REJECTED';
+      record['reviewedByStaffId'] = 'STF0012';
+      if (!approve) {
+        record['rejectionReason'] =
+            (jsonDecode(request.body) as Map<String, dynamic>)['reason'];
+      }
+      return http.Response(jsonEncode(record), 200);
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final ApprovalApi api = ApprovalApi(baseUrl: testBaseUrl, client: _client);
+
+  /// The JSON body of the last request to [pathPart].
+  Map<String, dynamic> lastBody(String pathPart) => jsonDecode(
+        requests.lastWhere((r) => r.url.path.contains(pathPart)).body,
+      ) as Map<String, dynamic>;
+}
+
 class FakeMemberBackend {
   FakeMemberBackend({this.branchesStatus = 200});
 
@@ -427,6 +618,18 @@ class FakeMemberBackend {
   List<Map<String, dynamic>> searchResults = [];
   int? searchTotal;
   final searches = <(String, int)>[];
+
+  /// Contact changes: each direct edit or request takes the next answer
+  /// from [contactAnswers]; when those run out it succeeds (a direct edit
+  /// updates [profiles], a request answers a waiting record).
+  /// [dropNextContact] makes the next one lose its connection.
+  /// [contactCalls] records ("PUT"/"POST", body).
+  final contactAnswers = <(int, String)>[];
+  final contactCalls = <(String, Map<String, dynamic>)>[];
+
+  /// The signed-in staff member's own requests, newest first.
+  List<Map<String, dynamic>> myRequests = [];
+  int myRequestsStatus = 200;
 
   /// A member's details in the backend's shape (section 18).
   static Map<String, dynamic> profileJson({
@@ -523,6 +726,39 @@ class FakeMemberBackend {
           ? _stream(404, errorBody(404, 'The requested resource was not found'))
           : _stream(200, jsonEncode(profile));
     }
+    if (path.contains('${MemberApi.adminUpdateMemberPath}/') ||
+        (path.contains('${MemberApi.updateRequestsPath}/') &&
+            request.method == 'POST')) {
+      final id = path.split('/').last;
+      final sent = jsonDecode(await body.bytesToString()) as Map<String, dynamic>;
+      contactCalls.add((request.method, sent));
+      if (_dropNext) {
+        _dropNext = false;
+        throw http.ClientException('connection dropped');
+      }
+      final answer = contactAnswers.isEmpty ? null : contactAnswers.removeAt(0);
+      if (answer != null) return _stream(answer.$1, answer.$2);
+      final profile = profiles[id] ?? profileJson(id: id);
+      if (request.method == 'PUT') {
+        profile.addAll(sent);
+        profiles[id] = profile;
+        return _stream(200, jsonEncode(profile));
+      }
+      return _stream(
+        200,
+        jsonEncode(updateRequestJson(
+          memberId: id,
+          current: profile,
+          proposed: sent,
+        )),
+      );
+    }
+    if (path.endsWith('${MemberApi.updateRequestsPath}/mine')) {
+      if (myRequestsStatus != 200) {
+        return _stream(myRequestsStatus, errorBody(myRequestsStatus, 'Nope'));
+      }
+      return _stream(200, pagedJson(myRequests, size: 100));
+    }
     if (path.endsWith(MemberApi.kycUploadPath)) {
       uploads.add(await _readMultipart(request, body));
       final answer =
@@ -536,6 +772,11 @@ class FakeMemberBackend {
   late final MemberApi api = MemberApi(baseUrl: testBaseUrl, client: _client);
   late final BranchApi branchApi =
       BranchApi(baseUrl: testBaseUrl, client: _client);
+
+  bool _dropNext = false;
+
+  /// Makes the next contact change lose its connection.
+  void dropNextContact() => _dropNext = true;
 
   static http.StreamedResponse _stream(int status, String body) =>
       http.StreamedResponse(Stream.value(utf8.encode(body)), status);
@@ -597,6 +838,7 @@ Apis fakeApis() {
     branches: staff.branchApi,
     transactions: FakeTransactionBackend().api,
     submissions: FakeSubmissionBackend().api,
+    approvals: FakeApprovalBackend().api,
   );
 }
 

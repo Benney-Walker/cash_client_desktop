@@ -9,8 +9,10 @@ import '../api/api_exception.dart';
 import '../api/endpoint.dart';
 import 'member_models.dart';
 import 'member_profile.dart';
+import 'member_update.dart';
 
 export 'member_profile.dart';
+export 'member_update.dart';
 
 /// Calls the backend's member endpoints (`MemberController`, open to
 /// administrators and agents). [client] should be the app's
@@ -35,6 +37,12 @@ class MemberApi {
   static const minQueryLength = 2;
   static const pageSize = 20;
   static const kycUploadPath = '/api/member/v1/kyc-document-upload';
+  static const updateRequestsPath = '/api/member/v1/update-requests';
+  static const adminUpdateMemberPath = '/api/admin/v1/update-member';
+
+  /// How many of the signed-in staff member's own requests are read to find
+  /// the latest one for a member (the backend's largest page).
+  static const myRequestsPageSize = 100;
 
   final String _baseUrl;
   final http.Client _client;
@@ -107,6 +115,81 @@ class MemberApi {
     );
     return MemberProfile.fromJson(decodeJson(response.body)) ??
         (throw unexpectedOk());
+  }
+
+  /// `PUT /api/admin/v1/update-member/{memberId}` (Administrators): saves
+  /// the new phone number, address and occupation at once and returns the
+  /// member's details.
+  ///
+  /// Throws [ApiException]: `conflict` (409) for a phone number another
+  /// member has, `validation` (400) for an empty field.
+  Future<MemberProfile> updateContact(
+    String memberId,
+    MemberContactUpdate update,
+  ) async {
+    final response = await sendChecked(
+      () => _client.put(
+        apiUri(_baseUrl,
+            '$adminUpdateMemberPath/${Uri.encodeComponent(memberId)}'),
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(update.toJson()),
+      ),
+      timeout: timeout,
+    );
+    return MemberProfile.fromJson(decodeJson(response.body)) ??
+        (throw unexpectedOk());
+  }
+
+  /// `POST /api/member/v1/update-requests/{memberId}`: asks an
+  /// Administrator to approve new contact details for a member of any
+  /// branch.
+  ///
+  /// Throws [ApiException]: `conflict` (409) when the member already has a
+  /// change waiting or another member has the phone number, `validation`
+  /// (400) when nothing changes.
+  Future<MemberUpdateRequestRecord> requestUpdate(
+    String memberId,
+    MemberContactUpdate update,
+  ) async {
+    final response = await sendChecked(
+      () => _client.post(
+        apiUri(_baseUrl,
+            '$updateRequestsPath/${Uri.encodeComponent(memberId)}'),
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(update.toJson()),
+      ),
+      timeout: timeout,
+    );
+    return MemberUpdateRequestRecord.fromJson(decodeJson(response.body)) ??
+        (throw unexpectedOk());
+  }
+
+  /// The signed-in staff member's latest request for [memberId], from the
+  /// first page of `GET /api/member/v1/update-requests/mine` (newest first),
+  /// or null when there's none there.
+  Future<MemberUpdateRequestRecord?> latestOwnRequest(String memberId) async {
+    final response = await sendChecked(
+      () => _client.get(
+        apiUri(_baseUrl, '$updateRequestsPath/mine', {
+          'page': '0',
+          'size': '$myRequestsPageSize',
+        }),
+        headers: const {'Accept': 'application/json'},
+      ),
+      timeout: timeout,
+    );
+    final page = PagedResult.fromJson(
+          decodeJson(response.body),
+          MemberUpdateRequestRecord.fromJson,
+        ) ??
+        (throw unexpectedOk());
+    return page.items.where((r) => r.memberId == memberId).firstOrNull;
   }
 
   /// `POST /api/member/v1/kyc-document-upload` (multipart). Sends the ID
@@ -253,6 +336,35 @@ String kycErrorMessage(Object error) {
       break;
   }
   return commonFailureMessage(error, action: 'upload ID documents');
+}
+
+/// A message for a failed contact change, saved directly or requested.
+String memberUpdateErrorMessage(Object error) {
+  if (error is! ApiException) return 'Something went wrong. Try again.';
+  final lower = (error.message ?? '').toLowerCase();
+  switch (error.failure) {
+    case ApiFailure.conflict:
+      if (lower.contains('phone number')) {
+        return 'Another member already uses this phone number.';
+      }
+      if (lower.contains('waiting')) {
+        return 'This member already has a change waiting for approval. '
+            'Wait for an administrator to review it.';
+      }
+    case ApiFailure.validation:
+      if (lower.contains('nothing to change')) {
+        return "These are the member's current details. Change at least "
+            'one before sending.';
+      }
+    case ApiFailure.forbidden:
+      return 'Only administrators can change member details directly.';
+    case ApiFailure.network:
+      return "Couldn't reach the server, so it isn't clear whether the "
+          'change was received. Refresh the member before trying again.';
+    default:
+      break;
+  }
+  return commonFailureMessage(error, action: 'change member details');
 }
 
 /// Messages every request shares. [action] completes "Only administrators

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api/api_exception.dart';
+import '../approvals/approval_api.dart' show ApprovalApi;
 import '../common/glass_card.dart';
 import '../common/gradient_button.dart';
 import '../common/step_flow.dart';
@@ -15,6 +17,10 @@ import 'member_status_style.dart';
 /// accounts and ID document, with "Upload ID document" when the backend
 /// says the signed-in staff member may upload.
 ///
+/// Contact details (phone, address, occupation): Administrators edit them
+/// directly; Agents send a change for an Administrator to approve and see
+/// their latest request's outcome here (owner decisions 24 November 2026).
+///
 /// Give it a key per member (`ValueKey(memberId)`) so it starts fresh when
 /// another member is chosen.
 class MemberDetailsPane extends StatefulWidget {
@@ -22,12 +28,16 @@ class MemberDetailsPane extends StatefulWidget {
     super.key,
     required this.api,
     required this.memberId,
+    this.approvalApi,
+    this.isAdministrator = false,
     this.pickImage = pickKycImageFile,
     this.acceptDrops = true,
   });
 
   final MemberApi api;
   final String memberId;
+  final ApprovalApi? approvalApi;
+  final bool isAdministrator;
   final PickKycImage pickImage;
   final bool acceptDrops;
 
@@ -50,16 +60,108 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
   final _formKey = GlobalKey<FormState>();
   final _document = KycDocumentDraft();
 
+  // Contact details.
+  bool _editingContact = false;
+  bool _savingContact = false;
+  String? _contactError;
+  String? _contactDone;
+  final _contactForm = GlobalKey<FormState>();
+  final _phone = TextEditingController();
+  final _address = TextEditingController();
+  final _occupation = TextEditingController();
+
+  /// An Agent's latest request for this member, or, for an Administrator,
+  /// a request waiting in Approvals.
+  MemberUpdateRequestRecord? _request;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadRequest();
   }
 
   @override
   void dispose() {
     _document.dispose();
+    _phone.dispose();
+    _address.dispose();
+    _occupation.dispose();
     super.dispose();
+  }
+
+  /// Best effort: the card is extra information, so a failure just leaves
+  /// it out.
+  Future<void> _loadRequest() async {
+    try {
+      final MemberUpdateRequestRecord? request;
+      if (widget.isAdministrator) {
+        final approvals = widget.approvalApi;
+        if (approvals == null) return;
+        final page = await approvals.listUpdates(
+          MemberUpdateStatus.pending,
+          size: MemberApi.myRequestsPageSize,
+        );
+        request =
+            page.items.where((r) => r.memberId == widget.memberId).firstOrNull;
+      } else {
+        request = await widget.api.latestOwnRequest(widget.memberId);
+      }
+      if (mounted) setState(() => _request = request);
+    } catch (_) {
+      // Leave the card out.
+    }
+  }
+
+  void _startContact(MemberProfile member) {
+    _phone.text = member.phoneNumber ?? '';
+    _address.text = member.residentialAddress ?? '';
+    _occupation.text = member.occupation ?? '';
+    setState(() {
+      _editingContact = true;
+      _contactError = null;
+      _contactDone = null;
+    });
+  }
+
+  void _cancelContact() => setState(() {
+        _editingContact = false;
+        _contactError = null;
+      });
+
+  Future<void> _saveContact() async {
+    if (_savingContact || !_contactForm.currentState!.validate()) return;
+    final update = MemberContactUpdate(
+      phoneNumber: _phone.text.trim(),
+      residentialAddress: _address.text.trim(),
+      occupation: _occupation.text.trim(),
+    );
+    setState(() {
+      _savingContact = true;
+      _contactError = null;
+    });
+    try {
+      if (widget.isAdministrator) {
+        final member = await widget.api.updateContact(widget.memberId, update);
+        if (!mounted) return;
+        setState(() {
+          _member = member;
+          _contactDone = 'Contact details saved.';
+        });
+      } else {
+        final request = await widget.api.requestUpdate(widget.memberId, update);
+        if (!mounted) return;
+        setState(() {
+          _request = request;
+          _contactDone = 'Change sent to an administrator for approval.';
+        });
+      }
+      setState(() => _editingContact = false);
+    } catch (error) {
+      if (mounted) setState(() => _contactError = memberUpdateErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _savingContact = false);
+    }
   }
 
   Future<void> _load() async {
@@ -189,8 +291,22 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
           key: const Key('$_k.details'),
           title: 'Details',
           icon: Icons.person_outline,
-          child: _detailRows(context, member),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRows(context, member),
+              ..._contactActions(context, member),
+            ],
+          ),
         ),
+        if (_editingContact) ...[
+          const SizedBox(height: 16),
+          _contactCard(),
+        ],
+        if (_request != null) ...[
+          const SizedBox(height: 16),
+          _requestCard(context, _request!),
+        ],
         const SizedBox(height: 16),
         GlassCard(
           key: const Key('$_k.accounts'),
@@ -237,6 +353,191 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
         for (final (label, value) in rows)
           if (value != null) _LabelValue(label: label, value: value),
       ],
+    );
+  }
+
+  List<Widget> _contactActions(BuildContext context, MemberProfile member) {
+    final done = _contactDone;
+    final waiting = !widget.isAdministrator &&
+        _request?.status == MemberUpdateStatus.pending;
+    // Another branch's member is shown without address and occupation, and
+    // a change replaces all three, so it isn't offered from that view.
+    final offer = !member.limited && !_editingContact && !waiting;
+    return [
+      if (done != null) ...[
+        const SizedBox(height: 12),
+        StatusPill(
+          key: const Key('$_k.contactDone'),
+          label: done,
+          tone: StatusTone.success,
+        ),
+      ],
+      if (offer) ...[
+        const SizedBox(height: 12),
+        widget.isAdministrator
+            ? OutlinedButton.icon(
+                key: const Key('$_k.editContact'),
+                onPressed: () => _startContact(member),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Edit contact details'),
+              )
+            : OutlinedButton.icon(
+                key: const Key('$_k.requestChange'),
+                onPressed: () => _startContact(member),
+                icon: const Icon(Icons.edit_note_outlined),
+                label: const Text('Request a change'),
+              ),
+      ],
+    ];
+  }
+
+  String? _required(String? value, String message) =>
+      value == null || value.trim().isEmpty ? message : null;
+
+  Widget _contactCard() {
+    final error = _contactError;
+    final admin = widget.isAdministrator;
+    return Form(
+      key: _contactForm,
+      child: GlassCard(
+        key: const Key('$_k.contactForm'),
+        title: admin ? 'Edit contact details' : 'Request a change',
+        icon: Icons.edit_outlined,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              key: const Key('$_k.phone'),
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Phone number',
+                hintText: '0241234567',
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Enter the phone number';
+                }
+                return MemberContactUpdate.phonePattern.hasMatch(value)
+                    ? null
+                    : 'Use 10 digits starting with 0';
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('$_k.address'),
+              controller: _address,
+              textCapitalization: TextCapitalization.words,
+              decoration:
+                  const InputDecoration(labelText: 'Residential address'),
+              validator: (v) => _required(v, 'Enter the residential address'),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('$_k.occupation'),
+              controller: _occupation,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Occupation'),
+              validator: (v) => _required(v, 'Enter the occupation'),
+            ),
+            const SizedBox(height: 12),
+            InfoNote(
+              text: admin
+                  ? 'Saved at once. The member\'s name, date of birth and '
+                      'branch can\'t be changed here.'
+                  : 'An administrator reviews the change before it\'s saved. '
+                      'You\'ll see the outcome on this member.',
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 12),
+              ErrorBanner(key: const Key('$_k.contactError'), message: error),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  key: const Key('$_k.cancelContact'),
+                  onPressed: _savingContact ? null : _cancelContact,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                GradientButton(
+                  key: const Key('$_k.saveContact'),
+                  onPressed: _savingContact ? null : _saveContact,
+                  child: _savingContact
+                      ? SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppGradients.of(context).onButton,
+                          ),
+                        )
+                      : Text(admin ? 'Save' : 'Send for approval'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _requestCard(BuildContext context, MemberUpdateRequestRecord r) {
+    final textTheme = Theme.of(context).textTheme;
+    final when = r.requestedAt == null ? null : dateAndTime(r.requestedAt!);
+
+    if (widget.isAdministrator) {
+      return InfoNote(
+        key: const Key('$_k.pendingForAdmin'),
+        text: '${r.requestedBy ?? 'A staff member'} asked to change this '
+            "member's contact details${when == null ? '' : ' on $when'}. "
+            'Review it in Approvals, Member updates.',
+      );
+    }
+
+    final pill = switch (r.status) {
+      MemberUpdateStatus.pending => const StatusPill(
+          label: 'Change waiting for approval', tone: StatusTone.warning),
+      MemberUpdateStatus.approved => const StatusPill(
+          label: 'Your change was approved', tone: StatusTone.success),
+      MemberUpdateStatus.rejected => const StatusPill(
+          label: 'Your change was rejected', tone: StatusTone.danger),
+    };
+    return GlassCard(
+      key: const Key('$_k.request'),
+      title: 'Your change request',
+      icon: Icons.edit_note_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          pill,
+          const SizedBox(height: 8),
+          for (final (label, _, next) in r.changes)
+            _LabelValue(label: label, value: next ?? '—'),
+          if (r.changes.isEmpty && r.status != MemberUpdateStatus.pending)
+            for (final (label, value) in [
+              ('Phone number', r.proposed.phoneNumber),
+              ('Address', r.proposed.residentialAddress),
+              ('Occupation', r.proposed.occupation),
+            ])
+              if (value != null) _LabelValue(label: label, value: value),
+          if (when != null) _LabelValue(label: 'Sent', value: when),
+          if (r.rejectionReason != null)
+            _LabelValue(label: 'Reason', value: r.rejectionReason!),
+          if (r.status == MemberUpdateStatus.rejected) ...[
+            const SizedBox(height: 4),
+            Text(
+              'You can send a new request with the details corrected.',
+              style: textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
     );
   }
 

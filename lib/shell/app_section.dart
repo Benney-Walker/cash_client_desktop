@@ -12,6 +12,7 @@ enum AppSection {
   dashboard('Dashboard', Icons.space_dashboard_outlined, Icons.space_dashboard),
   members('Members', Icons.people_outline, Icons.people),
   transactions('Transactions', Icons.payments_outlined, Icons.payments),
+  approvals('Approvals', Icons.verified_user_outlined, Icons.verified_user),
   collectors('Collectors', Icons.badge_outlined, Icons.badge),
   submissions(
     'Daily submissions',

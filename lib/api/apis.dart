@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 
+import '../approvals/approval_api.dart';
 import '../branches/branch_api.dart';
 import '../members/member_api.dart';
 import '../staff/staff_api.dart';
@@ -15,6 +16,7 @@ class Apis {
     required this.branches,
     required this.transactions,
     required this.submissions,
+    required this.approvals,
   });
 
   /// Every API on [baseUrl] through [client], which should be the app's
@@ -29,6 +31,7 @@ class Apis {
         branches: BranchApi(baseUrl: baseUrl, client: client),
         transactions: TransactionApi(baseUrl: baseUrl, client: client),
         submissions: SubmissionApi(baseUrl: baseUrl, client: client),
+        approvals: ApprovalApi(baseUrl: baseUrl, client: client),
       );
 
   final StaffApi staff;
@@ -36,4 +39,5 @@ class Apis {
   final BranchApi branches;
   final TransactionApi transactions;
   final SubmissionApi submissions;
+  final ApprovalApi approvals;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/apis.dart';
+import '../approvals/approvals_page.dart';
 import '../auth/auth_session.dart';
 import '../common/brand_mark.dart';
 import '../common/gradient_backdrop.dart';
@@ -45,6 +46,9 @@ class _AppShellState extends State<AppShell> {
   static const double _expandedWidth = 248;
 
   AppSection _section = AppSection.dashboard;
+
+  bool get _isAdministrator =>
+      widget.session.role == StaffRole.administrator;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +107,12 @@ class _AppShellState extends State<AppShell> {
         AppSection.members => MembersPage(
             api: widget.apis.members,
             branchApi: widget.apis.branches,
+            approvalApi: widget.apis.approvals,
+            isAdministrator: _isAdministrator,
+          ),
+        AppSection.approvals => ApprovalsPage(
+            api: widget.apis.approvals,
+            isAdministrator: _isAdministrator,
           ),
         AppSection.transactions => TransactionsPage(
             api: widget.apis.transactions,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../approvals/approval_api.dart';
 import '../branches/branch_api.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_backdrop.dart';
@@ -19,12 +20,22 @@ class MembersPage extends StatefulWidget {
     super.key,
     required this.api,
     required this.branchApi,
+    this.approvalApi,
+    this.isAdministrator = false,
     this.pickImage = pickKycImageFile,
     this.acceptDrops = true,
   });
 
   final MemberApi api;
   final BranchApi branchApi;
+
+  /// For Administrators, to say when a member has a change waiting in
+  /// Approvals.
+  final ApprovalApi? approvalApi;
+
+  /// Administrators edit contact details directly; Agents send a request
+  /// (owner decision 24 November 2026).
+  final bool isAdministrator;
 
   /// Replaced in tests, with [acceptDrops] off (no drag-and-drop plugin
   /// there).
@@ -111,6 +122,8 @@ class _MembersPageState extends State<MembersPage> {
                               key: ValueKey(selected),
                               api: widget.api,
                               memberId: selected,
+                              approvalApi: widget.approvalApi,
+                              isAdministrator: widget.isAdministrator,
                               pickImage: widget.pickImage,
                               acceptDrops: widget.acceptDrops,
                             ),
