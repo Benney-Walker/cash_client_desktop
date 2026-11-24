@@ -4,6 +4,7 @@ import '../approvals/approval_api.dart';
 import '../branches/branch_api.dart';
 import '../collectors/collector_api.dart';
 import '../dashboard/dashboard_api.dart';
+import '../loans/loan_api.dart';
 import '../members/member_api.dart';
 import '../staff/staff_api.dart';
 import '../submissions/submission_api.dart';
@@ -21,6 +22,7 @@ class Apis {
     required this.approvals,
     required this.dashboard,
     required this.collectors,
+    required this.loans,
   });
 
   /// Every API on [baseUrl] through [client], which should be the app's
@@ -38,6 +40,7 @@ class Apis {
         approvals: ApprovalApi(baseUrl: baseUrl, client: client),
         dashboard: DashboardApi(baseUrl: baseUrl, client: client),
         collectors: CollectorApi(baseUrl: baseUrl, client: client),
+        loans: LoanApi(baseUrl: baseUrl, client: client),
       );
 
   final StaffApi staff;
@@ -48,4 +51,5 @@ class Apis {
   final ApprovalApi approvals;
   final DashboardApi dashboard;
   final CollectorApi collectors;
+  final LoanApi loans;
 }

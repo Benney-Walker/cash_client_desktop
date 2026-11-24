@@ -81,13 +81,17 @@ void main() {
     expect(find.byKey(const Key('page.dashboard')), findsNothing);
   });
 
-  testWidgets('sections without screens say so', (tester) async {
+  testWidgets('every section has its screen now', (tester) async {
     await pumpShell(tester);
 
+    for (final section in AppSection.values) {
+      await tester.tap(find.text(section.label).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Not built yet'), findsNothing, reason: section.label);
+    }
     await tester.tap(find.text('Loans'));
     await tester.pumpAndSettle();
-
-    expect(find.text('Not built yet'), findsOneWidget);
+    expect(find.byKey(const Key('page.loans')), findsOneWidget);
   });
 
   testWidgets('a dashboard card opens its page and tab', (tester) async {

@@ -8,6 +8,7 @@ import 'package:cash_client_desktop/auth/auth_session.dart';
 import 'package:cash_client_desktop/branches/branch_api.dart';
 import 'package:cash_client_desktop/collectors/collector_api.dart';
 import 'package:cash_client_desktop/dashboard/dashboard_api.dart';
+import 'package:cash_client_desktop/loans/loan_api.dart';
 import 'package:cash_client_desktop/members/member_api.dart';
 import 'package:cash_client_desktop/settings/app_info.dart';
 import 'package:cash_client_desktop/settings/theme_mode_store.dart';
@@ -855,7 +856,268 @@ Apis fakeApis() {
     approvals: FakeApprovalBackend().api,
     dashboard: FakeDashboardBackend().api,
     collectors: FakeCollectorBackend().api,
+    loans: FakeLoanBackend().api,
   );
+}
+
+/// A loan product as the backend sends it (`LoanProductResponse`).
+Map<String, dynamic> productJson({
+  int id = 1,
+  String name = 'Salary advance',
+  num rate = 24.00,
+  num min = 500,
+  num max = 5000,
+  int maxTerm = 12,
+  String feeType = 'PERCENTAGE',
+  num fee = 2.00,
+  int guarantors = 1,
+  bool active = true,
+}) =>
+    {
+      'id': id,
+      'name': name,
+      'interestRatePercent': rate,
+      'minAmount': min,
+      'maxAmount': max,
+      'maxTermMonths': maxTerm,
+      'processingFeeType': feeType,
+      'processingFeeValue': fee,
+      'guarantorsRequired': guarantors,
+      'active': active,
+      'updatedAt': '2026-11-24T08:00:00',
+      'updatedBy': 'STF0012',
+    };
+
+/// A loan application as the backend sends it (`LoanApplicationResponse`).
+Map<String, dynamic> loanApplicationJson({
+  String id = 'app-1',
+  String memberId = 'm-1',
+  String memberName = 'Ama Owusu',
+  int productId = 1,
+  String productName = 'Salary advance',
+  num amount = 2000,
+  int term = 6,
+  String status = 'PENDING',
+  List<Map<String, dynamic>>? guarantors,
+  String? rejectionReason,
+  num? approvedAmount,
+}) =>
+    {
+      'id': id,
+      'memberId': memberId,
+      'memberName': memberName,
+      'branchName': 'Tarkwa',
+      'productId': productId,
+      'productName': productName,
+      'requestedAmount': amount,
+      'termMonths': term,
+      'approvedAmount': approvedAmount,
+      'purpose': 'School fees',
+      'status': status,
+      'rejectionReason': rejectionReason,
+      'appliedBy': 'STF0020',
+      'reviewedBy': status == 'PENDING' ? null : 'STF0012',
+      'createdAt': '2026-11-24T09:00:00',
+      'reviewedAt': status == 'PENDING' ? null : '2026-11-24T10:00:00',
+      'guarantors': guarantors,
+      'loanId': status == 'APPROVED' ? 'loan-1' : null,
+    };
+
+/// A loan as the backend sends it (`LoanResponse`).
+Map<String, dynamic> loanJson({
+  String id = 'loan-1',
+  String memberId = 'm-1',
+  String status = 'ACTIVE',
+  num outstanding = 1866.65,
+  num overdue = 0,
+}) =>
+    {
+      'id': id,
+      'applicationId': 'app-0',
+      'memberId': memberId,
+      'memberName': 'Ama Owusu',
+      'accountNumber': '2004567891',
+      'productName': 'Salary advance',
+      'amount': 2000,
+      'interestRatePercent': 24.00,
+      'totalInterest': 240,
+      'totalToRepay': 2240,
+      'processingFee': 40,
+      'termMonths': 6,
+      'disbursementDate': '2026-10-24',
+      'maturityDate': '2027-04-24',
+      'status': status,
+      'paid': 373.33,
+      'outstanding': outstanding,
+      'overdue': overdue,
+      'installments': [
+        {'number': 1, 'dueDate': '2026-11-24', 'amount': 373.33, 'paid': 373.33, 'remaining': 0, 'status': 'PAID'},
+        {'number': 2, 'dueDate': '2026-12-24', 'amount': 373.33, 'paid': 0, 'remaining': 373.33, 'status': 'PENDING'},
+      ],
+    };
+
+/// The loan endpoints: products (and the Administrators' edits),
+/// applications (apply, list, read, approve, reject), a member's loans, one
+/// loan, and the portfolio's active loans. Reviews change the records the
+/// way the backend does. [actionStatus] makes applying and reviewing fail
+/// with that status and [actionMessage]; [dropApply] loses the next
+/// apply's answer.
+class FakeLoanBackend {
+  FakeLoanBackend();
+
+  final requests = <http.Request>[];
+  int? actionStatus;
+  String actionMessage = 'Not allowed';
+  bool dropApply = false;
+
+  List<Map<String, dynamic>> products = [
+    productJson(),
+    productJson(id: 2, name: 'Emergency loan', rate: 30, min: 100, max: 1000,
+        maxTerm: 3, feeType: 'FLAT', fee: 10, guarantors: 0, active: false),
+  ];
+  final applications = <Map<String, dynamic>>[
+    loanApplicationJson(guarantors: [
+      {'memberId': 'm-9', 'name': 'Kofi Mensah'},
+    ]),
+    loanApplicationJson(id: 'app-2', memberId: 'm-2', memberName: 'Kojo Addo',
+        amount: 800, term: 3, status: 'REJECTED', rejectionReason: 'Too soon'),
+  ];
+  final memberLoans = <String, List<Map<String, dynamic>>>{
+    'm-1': [loanJson()],
+  };
+  List<Map<String, dynamic>> portfolio = [
+    {
+      'loanId': 'loan-1',
+      'memberId': 'm-1',
+      'memberName': 'Ama Owusu',
+      'branchName': 'Tarkwa',
+      'productName': 'Salary advance',
+      'disbursementDate': '2026-10-24',
+      'amount': 2000,
+      'totalToRepay': 2240,
+      'paid': 373.33,
+      'outstanding': 1866.65,
+      'overdue': 0,
+      'nextDueDate': '2026-12-24',
+    },
+    {
+      'loanId': 'loan-2',
+      'memberId': 'm-5',
+      'memberName': 'Esi Boateng',
+      'branchName': 'Accra',
+      'productName': 'Salary advance',
+      'disbursementDate': '2026-08-01',
+      'amount': 1000,
+      'totalToRepay': 1100,
+      'paid': 200,
+      'outstanding': 900,
+      'overdue': 183.33,
+      'nextDueDate': '2026-11-01',
+    },
+  ];
+
+  /// The JSON body of the last request whose path ends with [ending].
+  Map<String, dynamic>? lastBody(String ending) {
+    final r = requests.lastWhere((r) => r.url.path.endsWith(ending));
+    return r.body.isEmpty ? null : jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  List<String> get posts => [
+        for (final r in requests)
+          if (r.method != 'GET') '${r.method} ${r.url.path}',
+      ];
+
+  late final http.Client _client = MockClient((request) async {
+    requests.add(request);
+    final path = request.url.path;
+    final segments = request.url.pathSegments;
+    final q = request.url.queryParameters;
+    http.Response json(Object body, [int status = 200]) =>
+        http.Response(jsonEncode(body), status);
+
+    if (path == LoanApi.productsPath) return json(products);
+    if (path.startsWith(LoanApi.adminProductsPath)) {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final isNew = request.method == 'POST';
+      final id = isNew ? products.length + 1 : int.parse(segments.last);
+      final saved = productJson(
+        id: id,
+        name: body['name'] as String,
+        rate: body['interestRatePercent'] as num,
+        min: body['minAmount'] as num,
+        max: body['maxAmount'] as num,
+        maxTerm: body['maxTermMonths'] as int,
+        feeType: body['processingFeeType'] as String,
+        fee: body['processingFeeValue'] as num,
+        guarantors: body['guarantorsRequired'] as int,
+        active: body['active'] as bool,
+      );
+      products = [...products.where((p) => p['id'] != id), saved];
+      return json(saved, isNew ? 201 : 200);
+    }
+    if (path == LoanApi.applicationsPath && request.method == 'POST') {
+      if (dropApply) {
+        dropApply = false;
+        throw http.ClientException('connection dropped');
+      }
+      final failing = actionStatus;
+      if (failing != null) return http.Response(errorBody(failing, actionMessage), failing);
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final created = loanApplicationJson(
+        id: 'app-${applications.length + 1}',
+        memberId: body['memberId'] as String,
+        productId: body['productId'] as int,
+        amount: body['amount'] as num,
+        term: body['termMonths'] as int,
+      );
+      applications.insert(0, created);
+      return json(created, 201);
+    }
+    if (path == LoanApi.applicationsPath) {
+      final matching = applications.where((a) =>
+          (q['status'] == null || a['status'] == q['status']) &&
+          (q['memberId'] == null || a['memberId'] == q['memberId'])).toList();
+      return http.Response(pagedJson(matching), 200);
+    }
+    if (path.startsWith('${LoanApi.applicationsPath}/')) {
+      final a = applications.where((a) => a['id'] == segments.last).firstOrNull;
+      return a == null ? http.Response(errorBody(404, 'Loan application not found'), 404) : json(a);
+    }
+    if (path.startsWith('${LoanApi.memberLoansPath}/')) {
+      return json(memberLoans[segments[segments.length - 2]] ?? []);
+    }
+    if (path.startsWith('${LoanApi.loanPath}/')) {
+      for (final loans in memberLoans.values) {
+        for (final l in loans) {
+          if (l['id'] == segments.last) return json(l);
+        }
+      }
+      return json(loanJson(id: segments.last));
+    }
+    if (path == LoanApi.portfolioPath) {
+      return json({'loans': portfolio, 'activeLoans': portfolio.length});
+    }
+    if (path.startsWith('${LoanApi.adminApplicationsPath}/')) {
+      final failing = actionStatus;
+      if (failing != null) return http.Response(errorBody(failing, actionMessage), failing);
+      final id = segments[segments.length - 2];
+      final a = applications.where((a) => a['id'] == id).first;
+      final approve = segments.last == 'approve';
+      a['status'] = approve ? 'APPROVED' : 'REJECTED';
+      a['reviewedBy'] = 'STF0012';
+      if (approve) {
+        final body = request.body.isEmpty ? null : jsonDecode(request.body) as Map<String, dynamic>;
+        a['approvedAmount'] = body?['approvedAmount'] ?? a['requestedAmount'];
+        a['loanId'] = 'loan-9';
+      } else {
+        a['rejectionReason'] = (jsonDecode(request.body) as Map<String, dynamic>)['reason'];
+      }
+      return json(a);
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final LoanApi api = LoanApi(baseUrl: testBaseUrl, client: _client);
 }
 
 /// A location point as the backend sends it (`LocationPointResponse`).

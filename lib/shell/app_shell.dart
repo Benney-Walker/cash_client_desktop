@@ -9,6 +9,7 @@ import '../common/gradient_backdrop.dart';
 import '../collectors/collectors_page.dart';
 import '../config/app_config.dart';
 import '../dashboard/dashboard_page.dart';
+import '../loans/loans_page.dart';
 import '../members/members_page.dart';
 import '../settings/app_info.dart';
 import '../settings/settings_screen.dart';
@@ -154,7 +155,14 @@ class _AppShellState extends State<AppShell> {
             api: widget.apis.members,
             branchApi: widget.apis.branches,
             approvalApi: widget.apis.approvals,
+            loanApi: widget.apis.loans,
             isAdministrator: _isAdministrator,
+          ),
+        AppSection.loans => LoansPage(
+            api: widget.apis.loans,
+            memberApi: widget.apis.members,
+            isAdministrator: _isAdministrator,
+            scopeBranch: _scopeBranch,
           ),
         AppSection.approvals => ApprovalsPage(
             key: ValueKey('approvals-$_approvalsTab'),

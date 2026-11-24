@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../approvals/approval_api.dart';
 import '../branches/branch_api.dart';
+import '../loans/loan_api.dart';
+import '../loans/loan_application_flow.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_backdrop.dart';
 import '../common/gradient_button.dart';
@@ -21,6 +23,7 @@ class MembersPage extends StatefulWidget {
     required this.api,
     required this.branchApi,
     this.approvalApi,
+    this.loanApi,
     this.isAdministrator = false,
     this.pickImage = pickKycImageFile,
     this.acceptDrops = true,
@@ -32,6 +35,9 @@ class MembersPage extends StatefulWidget {
   /// For Administrators, to say when a member has a change waiting in
   /// Approvals.
   final ApprovalApi? approvalApi;
+
+  /// For the member's Loans card and "Apply for a loan".
+  final LoanApi? loanApi;
 
   /// Administrators edit contact details directly; Agents send a request
   /// (owner decision 24 November 2026).
@@ -50,8 +56,28 @@ class _MembersPageState extends State<MembersPage> {
   bool _registering = false;
   String? _selectedId;
 
+  /// Set while "Apply for a loan" is open from a member's details.
+  PickedMember? _applyingFor;
+
+  /// Bumped to reload the details after an application.
+  int _detailsRun = 0;
+
   @override
   Widget build(BuildContext context) {
+    final applyingFor = _applyingFor;
+    final loanApi = widget.loanApi;
+    if (applyingFor != null && loanApi != null) {
+      return LoanApplicationFlow(
+        api: loanApi,
+        memberApi: widget.api,
+        member: applyingFor,
+        closeLabel: 'Members',
+        onClose: () => setState(() {
+          _applyingFor = null;
+          _detailsRun++;
+        }),
+      );
+    }
     if (_registering) {
       return RegisterMemberFlow(
         api: widget.api,
@@ -119,10 +145,14 @@ class _MembersPageState extends State<MembersPage> {
                       child: selected == null
                           ? const _NothingSelected()
                           : MemberDetailsPane(
-                              key: ValueKey(selected),
+                              key: ValueKey('$selected-$_detailsRun'),
                               api: widget.api,
                               memberId: selected,
                               approvalApi: widget.approvalApi,
+                              loanApi: widget.loanApi,
+                              onApplyForLoan: widget.loanApi == null
+                                  ? null
+                                  : (m) => setState(() => _applyingFor = m),
                               isAdministrator: widget.isAdministrator,
                               pickImage: widget.pickImage,
                               acceptDrops: widget.acceptDrops,

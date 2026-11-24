@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../api/api_exception.dart';
 import '../approvals/approval_api.dart' show ApprovalApi;
+import '../loans/loan_api.dart';
+import '../loans/loan_application_flow.dart' show PickedMember;
+import '../loans/loan_widgets.dart';
 import '../common/glass_card.dart';
 import '../common/gradient_button.dart';
 import '../common/step_flow.dart';
@@ -29,6 +32,8 @@ class MemberDetailsPane extends StatefulWidget {
     required this.api,
     required this.memberId,
     this.approvalApi,
+    this.loanApi,
+    this.onApplyForLoan,
     this.isAdministrator = false,
     this.pickImage = pickKycImageFile,
     this.acceptDrops = true,
@@ -37,6 +42,12 @@ class MemberDetailsPane extends StatefulWidget {
   final MemberApi api;
   final String memberId;
   final ApprovalApi? approvalApi;
+
+  /// For the member's loans; the Loans card is left out without it.
+  final LoanApi? loanApi;
+
+  /// Opens "Apply for a loan" with this member filled in.
+  final ValueChanged<PickedMember>? onApplyForLoan;
   final bool isAdministrator;
   final PickKycImage pickImage;
   final bool acceptDrops;
@@ -74,11 +85,79 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
   /// a request waiting in Approvals.
   MemberUpdateRequestRecord? _request;
 
+  // Loans.
+  List<LoanDetails>? _loans;
+  LoanApplicationRecord? _waitingApplication;
+  Object? _loansError;
+
   @override
   void initState() {
     super.initState();
     _load();
     _loadRequest();
+    _loadLoans();
+  }
+
+  Future<void> _loadLoans() async {
+    final api = widget.loanApi;
+    if (api == null) return;
+    setState(() => _loansError = null);
+    try {
+      final (loans, applications) = await (
+        api.memberLoans(widget.memberId),
+        api.memberApplications(widget.memberId),
+      ).wait;
+      if (!mounted) return;
+      setState(() {
+        _loans = loans;
+        _waitingApplication = applications
+            .where((a) => a.status == LoanApplicationStatus.pending)
+            .firstOrNull;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _loansError = e);
+    }
+  }
+
+  Future<void> _openLoan(LoanDetails loan) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        key: const Key('memberDetails.loanDialog'),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 720),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        loan.productName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('memberDetails.closeLoan'),
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(child: LoanPane(api: widget.loanApi!, loanId: loan.id)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -318,6 +397,10 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
           const SizedBox(height: 16),
           _uploading ? _uploadCard() : _kycCard(context, kyc),
         ],
+        if (widget.loanApi != null) ...[
+          const SizedBox(height: 16),
+          _loansCard(context, member),
+        ],
       ],
     );
   }
@@ -538,6 +621,98 @@ class _MemberDetailsPaneState extends State<MemberDetailsPane> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _loansCard(BuildContext context, MemberProfile member) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final loans = _loans;
+    final waiting = _waitingApplication;
+    final error = _loansError;
+    final active = loans?.where((l) => !l.closed).firstOrNull;
+
+    final List<Widget> body;
+    if (error != null) {
+      body = [
+        Text(loanErrorMessage(error), style: TextStyle(color: scheme.error)),
+        TextButton.icon(
+          onPressed: _loadLoans,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Try again'),
+        ),
+      ];
+    } else if (loans == null) {
+      body = [const Center(child: CircularProgressIndicator())];
+    } else {
+      final String? cannotApply = member.status != MembershipStatus.active
+          ? 'Only active members (ID verified) can get a loan.'
+          : waiting != null
+              ? null
+              : active != null
+                  ? 'One loan at a time: this member is still repaying one.'
+                  : null;
+      body = [
+        if (waiting != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              key: const Key('$_k.loanWaiting'),
+              children: [
+                const StatusPill(label: 'Application waiting', tone: StatusTone.warning),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${amountAndTerm(waiting.requestedAmount, waiting.termMonths)} · '
+                    '${waiting.productName}',
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (loans.isEmpty && waiting == null)
+          Text('No loans yet.', key: const Key('$_k.noLoans'), style: textTheme.bodyMedium),
+        for (final l in loans)
+          ListTile(
+            key: Key('$_k.loan.${l.id}'),
+            contentPadding: EdgeInsets.zero,
+            title: Text('${l.productName} · ${l.amount}'),
+            subtitle: Text(l.closed
+                ? 'Repaid'
+                : l.overdue.isPositive
+                    ? '${l.outstanding} still owed · ${l.overdue} overdue'
+                    : '${l.outstanding} still owed'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _openLoan(l),
+          ),
+        if (cannotApply != null) ...[
+          const SizedBox(height: 8),
+          Text(cannotApply, key: const Key('$_k.cannotApply'), style: textTheme.bodySmall),
+        ] else if (waiting == null && widget.onApplyForLoan != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const Key('$_k.applyForLoan'),
+            onPressed: () => widget.onApplyForLoan!(PickedMember(
+              id: member.memberId,
+              name: member.fullName,
+              status: member.status,
+              detail: [member.phoneNumber, member.branchName]
+                  .whereType<String>()
+                  .join(' · '),
+            )),
+            icon: const Icon(Icons.request_quote_outlined),
+            label: const Text('Apply for a loan'),
+          ),
+        ],
+      ];
+    }
+
+    return GlassCard(
+      key: const Key('$_k.loans'),
+      title: 'Loans',
+      icon: Icons.request_quote_outlined,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: body),
     );
   }
 
