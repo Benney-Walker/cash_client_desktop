@@ -6,6 +6,7 @@ import '../auth/auth_session.dart';
 import '../auth/profile_controller.dart';
 import '../common/brand_mark.dart';
 import '../common/gradient_backdrop.dart';
+import '../collectors/collectors_page.dart';
 import '../config/app_config.dart';
 import '../dashboard/dashboard_page.dart';
 import '../members/members_page.dart';
@@ -32,6 +33,7 @@ class AppShell extends StatefulWidget {
     required this.theme,
     required this.sidebar,
     required this.appInfo,
+    this.showMapTiles = true,
   });
 
   final AuthSession session;
@@ -43,6 +45,9 @@ class AppShell extends StatefulWidget {
   final ThemeController theme;
   final SidebarController sidebar;
   final AppInfo appInfo;
+
+  /// Off in tests, so the Collectors map downloads no tiles.
+  final bool showMapTiles;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -156,6 +161,12 @@ class _AppShellState extends State<AppShell> {
             api: widget.apis.approvals,
             isAdministrator: _isAdministrator,
             initialTab: _approvalsTab,
+          ),
+        AppSection.collectors => CollectorsPage(
+            api: widget.apis.collectors,
+            staffApi: widget.apis.staff,
+            scopeBranch: _scopeBranch,
+            showTiles: widget.showMapTiles,
           ),
         AppSection.dashboard => DashboardPage(
             api: widget.apis.dashboard,

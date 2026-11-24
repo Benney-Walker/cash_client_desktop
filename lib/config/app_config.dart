@@ -19,4 +19,23 @@ abstract final class AppConfig {
     'CREDIT_UNION_NAME',
     defaultValue: 'Cash Client',
   );
+
+  /// Where the Collectors map gets its tiles. OpenStreetMap by default
+  /// (owner decision 24 November 2026): free, no key, fine for a few office
+  /// staff under its usage policy, which needs the credit below. A keyed
+  /// provider (MapTiler, Stadia) can be set at build time with
+  /// `--dart-define=MAP_TILE_URL=...` and `MAP_ATTRIBUTION=...`.
+  static const mapTileUrl = String.fromEnvironment(
+    'MAP_TILE_URL',
+    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  );
+
+  static const mapAttribution = String.fromEnvironment(
+    'MAP_ATTRIBUTION',
+    defaultValue: '© OpenStreetMap contributors',
+  );
+
+  /// Sent with tile requests, as OpenStreetMap's policy asks, so the app
+  /// can be identified.
+  static const mapUserAgentPackage = 'com.bynexlabs.cash_client_desktop';
 }

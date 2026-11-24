@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 
 import '../approvals/approval_api.dart';
 import '../branches/branch_api.dart';
+import '../collectors/collector_api.dart';
 import '../dashboard/dashboard_api.dart';
 import '../members/member_api.dart';
 import '../staff/staff_api.dart';
@@ -19,6 +20,7 @@ class Apis {
     required this.submissions,
     required this.approvals,
     required this.dashboard,
+    required this.collectors,
   });
 
   /// Every API on [baseUrl] through [client], which should be the app's
@@ -35,6 +37,7 @@ class Apis {
         submissions: SubmissionApi(baseUrl: baseUrl, client: client),
         approvals: ApprovalApi(baseUrl: baseUrl, client: client),
         dashboard: DashboardApi(baseUrl: baseUrl, client: client),
+        collectors: CollectorApi(baseUrl: baseUrl, client: client),
       );
 
   final StaffApi staff;
@@ -44,4 +47,5 @@ class Apis {
   final SubmissionApi submissions;
   final ApprovalApi approvals;
   final DashboardApi dashboard;
+  final CollectorApi collectors;
 }

@@ -6,6 +6,7 @@ import 'package:cash_client_desktop/approvals/approval_api.dart';
 import 'package:cash_client_desktop/auth/auth_api.dart';
 import 'package:cash_client_desktop/auth/auth_session.dart';
 import 'package:cash_client_desktop/branches/branch_api.dart';
+import 'package:cash_client_desktop/collectors/collector_api.dart';
 import 'package:cash_client_desktop/dashboard/dashboard_api.dart';
 import 'package:cash_client_desktop/members/member_api.dart';
 import 'package:cash_client_desktop/settings/app_info.dart';
@@ -853,7 +854,117 @@ Apis fakeApis() {
     submissions: FakeSubmissionBackend().api,
     approvals: FakeApprovalBackend().api,
     dashboard: FakeDashboardBackend().api,
+    collectors: FakeCollectorBackend().api,
   );
+}
+
+/// A location point as the backend sends it (`LocationPointResponse`).
+Map<String, dynamic> pointJson(
+  String time, {
+  double lat = 5.3000,
+  double lng = -1.9900,
+  bool payment = false,
+  Map<String, dynamic>? paid,
+  int battery = 80,
+  String? receivedTime,
+}) =>
+    {
+      'latitude': lat,
+      'longitude': lng,
+      'accuracyMeters': 12.4,
+      'batteryPercent': battery,
+      'trigger': payment ? 'PAYMENT' : 'EVERY_5_MIN',
+      'recordedAt': '2026-11-25T$time:00',
+      'receivedAt': '2026-11-25T${receivedTime ?? time}:05',
+      'payment': paid,
+    };
+
+/// A payment placed on a point.
+Map<String, dynamic> paidJson(num amount, {String member = 'Ama Owusu', String status = 'COMPLETED'}) =>
+    {
+      'transactionId': 'tx-$amount',
+      'type': 'DEPOSIT',
+      'amount': amount,
+      'status': status,
+      'memberName': member,
+      'accountNumber': '2004567891',
+    };
+
+/// The Collectors endpoints: each collector's trail (by staff ID) and the
+/// collector collections report's days.
+class FakeCollectorBackend {
+  FakeCollectorBackend();
+
+  final requests = <http.Request>[];
+  int trailStatus = 200;
+  int reportStatus = 200;
+
+  /// Points by collector staff ID; anyone else has none.
+  final trails = <String, List<Map<String, dynamic>>>{
+    'STF0031': [
+      pointJson('08:05', lat: 5.300, lng: -1.990, battery: 92),
+      pointJson('08:10', lat: 5.301, lng: -1.989),
+      pointJson('09:12', lat: 5.302, lng: -1.988, payment: true, paid: paidJson(100)),
+      pointJson('09:17', lat: 5.303, lng: -1.987),
+      pointJson('09:40', lat: 5.304, lng: -1.986, payment: true,
+          paid: paidJson(50, member: 'Kofi Addo', status: 'FAILED')),
+      pointJson('10:02', lat: 5.305, lng: -1.985, payment: true,
+          receivedTime: '11:30'),
+      pointJson('17:30', lat: 5.306, lng: -1.984, battery: 41),
+    ],
+  };
+
+  List<Map<String, dynamic>> days = [
+    {
+      'date': '2026-11-25',
+      'collectorStaffId': 'STF0031',
+      'collectorName': 'Yaw Boateng',
+      'branchName': 'Tarkwa Market',
+      'payments': 12,
+      'amount': 1250.00,
+      'failedPayments': 1,
+      'failedAmount': 50.00,
+    },
+  ];
+
+  List<String> get trailDates => [
+        for (final r in requests)
+          if (r.url.path.startsWith(CollectorApi.locationsPath))
+            '${r.url.pathSegments.last} ${r.url.queryParameters['date']}',
+      ];
+
+  late final http.Client _client = MockClient((request) async {
+    requests.add(request);
+    final path = request.url.path;
+    if (path.startsWith('${CollectorApi.locationsPath}/')) {
+      if (trailStatus != 200) {
+        return http.Response(
+            errorBody(trailStatus, 'This collector is from another branch'),
+            trailStatus);
+      }
+      return http.Response(
+          jsonEncode(trails[request.url.pathSegments.last] ?? []), 200);
+    }
+    if (path.endsWith(CollectorApi.collectionsReportPath)) {
+      if (reportStatus != 200) {
+        return http.Response(errorBody(reportStatus, 'Boom'), reportStatus);
+      }
+      return http.Response(
+        jsonEncode({
+          'days': days,
+          'submissions': [],
+          'collected': 0,
+          'expected': 0,
+          'counted': 0,
+          'surplus': 0,
+        }),
+        200,
+      );
+    }
+    return http.Response(errorBody(404, 'Not found'), 404);
+  });
+
+  late final CollectorApi api = CollectorApi(baseUrl: testBaseUrl, client: _client);
 }
 
 /// The endpoints the dashboard reads: the three reports and the lists it

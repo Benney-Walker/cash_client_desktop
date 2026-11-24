@@ -40,6 +40,12 @@ dependencies:
   # printing opens the system print dialog (Windows and macOS).
   pdf: ^3.11.1
   printing: ^5.13.4
+  # A collector's day on a map (Collectors, option C1). Pure Flutter, so it
+  # runs on Windows and macOS (Google's map plugin doesn't run on Windows).
+  # Tiles come from OpenStreetMap by default (owner decision 24 November
+  # 2026); see AppConfig.mapTileUrl.
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:

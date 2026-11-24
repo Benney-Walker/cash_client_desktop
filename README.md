@@ -51,11 +51,12 @@ Receipts print the credit union's name from
 | Member contact details | ✅ Administrators edit phone, address and occupation directly from member details; Agents send a change for approval and see their latest request's outcome on the member |
 | Roles and branch | ✅ Agents don't see Approvals. The staff member's branch (from `GET /api/staff/v1/me`, read once per sign-in) shows on the Account and lock cards, and Agents see "… branch only" on Staff and Daily submissions. A changed role signs the staff member out with an explanation (found at unlock or after a 403) |
 | Dashboard | ✅ D3 layout, content D-C: headline with the period's deposits and withdrawals and what's waiting; waiting cards that open their page (Approvals on the right tab); totals by type and loans now. Today, this week or this month; Administrators can narrow to one branch. All figures from existing report and list endpoints |
+| Collectors | ✅ C1: collectors with their payments for the day beside that collector's day: route on an OpenStreetMap map with payments pinned, and a timeline (payments, first and last positions, or every 5-minute position). Any day in the last 90 days. Release phone stays on Staff |
 | Members: Register member | ✅ Five steps (M1): Personal, Contact and work, Account (Savings or Current, branch), ID document (Ghana Card or Voter's ID, ID number, JPEG/PNG picture up to 5 MB, chosen or dragged in, with preview; can be skipped), Review. Administrators and Agents. Posts to `/api/member/v1/add-member` with an idempotency key, then uploads the ID to `/api/member/v1/kyc-document-upload`; if only the upload fails, just the ID is retried; View member opens the new member |
 | Members: find and view (P2) | ✅ Search on the left (name, phone or account number; proposed `GET /api/member/v1/search`), details on the right: status, ID status, details, accounts, ID document with Upload ID document when the backend allows; limited view for another branch's member. The backend's search is now built at `/api/member/v1/search-members` with a different shape, so the desktop's search must be switched over; details still lack the ID status (CASH_CLIENT_DESKTOP.md §20) |
 | Transactions (T3) | ✅ Find the account by number, name or phone; account card (member, status, available and current balance) and recent history on the left; withdrawal, deposit, share purchase and transfer on the right with a review step (fee shown once the backend offers its settings), one idempotency key per review, same-key retries, "outcome unknown" handling; result with "Print receipt" (A4, no balance) |
 | Daily submissions (S3) | ✅ Waiting and Approved lists; a day's totals and payments; cash-count helper (cedi notes and 50p/20p coins) with a running total that turns green at the expected cash; Approve off while short, surplus approved directly; lost answers retried with the same count |
-| Collectors, Loans and Reports | Not started: backend ready; each starts with design options (build plan Phases 8–10) |
+| Loans and Reports | Not started: backend ready; each starts with design options (build plan Phases 9–10) |
 
 ### Sidebar sections
 
@@ -64,8 +65,8 @@ submissions, Loans, Staff, Settings. The grouping and order are a first proposal
 Transactions (renamed from Withdrawals on 2026-11-24) holds the counter's
 withdrawals, deposits, share purchases and transfers; collector
 withdrawal requests were removed from the system on 2026-11-15. Settings,
-Dashboard, Members, Transactions, Approvals, Daily submissions and Staff
-have screens so far. Agents see every section except Approvals, which the
+Dashboard, Members, Transactions, Approvals, Collectors, Daily submissions
+and Staff have screens so far. Agents see every section except Approvals, which the
 backend keeps to Administrators.
 
 ## Design decisions
@@ -126,6 +127,7 @@ lib/
   staff/               Staff page, Add staff steps, staff API and models
   approvals/           Approvals queues, ID picture viewer, review API
   dashboard/           Dashboard page and the figures it reads
+  collectors/          Collectors page, map and timeline, location API
   branches/            branch list API, branch model and picker
   api/                 backend errors, the authenticated HTTP client, Apis bundle
   auth/                sign-in API, session, gate, sign-in screen
@@ -203,6 +205,10 @@ test/                  mirrors lib/
 - **2026-11-24** Dashboard (Phase 7, D-C): figures from the report
   endpoints and list totals; period switch; Administrators' branch picker;
   cards open their pages. New `DashboardApi` in the `Apis` bundle.
+- **2026-11-24** Collectors (Phase 8, C1): a collector's day on an
+  OpenStreetMap map with payments pinned, and a timeline; 90 days back.
+  Added `flutter_map` and `latlong2`; build defines `MAP_TILE_URL` and
+  `MAP_ATTRIBUTION` for a keyed tile provider later.
 
 ## Known limitations
 
@@ -215,7 +221,8 @@ test/                  mirrors lib/
   `flutter pub get`, `flutter analyze` and `flutter test` locally;
   `pubspec.lock` will update to add `shared_preferences`,
   `package_info_plus`, `http`, `http_parser`, `file_selector`,
-  `desktop_drop`, `url_launcher`, `pdf` and `printing`.
+  `desktop_drop`, `url_launcher`, `pdf`, `printing`, `flutter_map` and
+  `latlong2`.
 - Register member and Add staff need the backend's `claude/backend-progress`
   branch (branch list, add-staff without a password). Until
   the backend reads `idempotencyKey` on add-member, a retry after a lost
